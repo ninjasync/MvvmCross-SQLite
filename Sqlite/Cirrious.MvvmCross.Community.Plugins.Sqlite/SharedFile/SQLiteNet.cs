@@ -465,7 +465,7 @@ namespace Community.SQLite
             {
                 foreach (var i in c.Indices)
                 {
-                    var iname = i.Name ?? map.TableName + "_" + c.Name;
+                    var iname = map.TableName + "_" + (i.Name ?? c.Name);
                     IndexInfo iinfo;
                     if (!indexes.TryGetValue(iname, out iinfo))
                     {
