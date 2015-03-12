@@ -833,6 +833,22 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         int Update(object obj);
 
         /// <summary>
+        /// Updates the specified columns of a table using the specified object
+        /// except for its primary key.
+        /// The object is required to have a primary key.
+        /// </summary>
+        /// <param name="obj">
+        /// The object to update. It must have a primary key designated using the PrimaryKeyAttribute.
+        /// </param>
+        /// <param name="properties">
+        /// the properties to update.
+        /// </param>
+        /// <returns>
+        /// The number of rows updated.
+        /// </returns>
+        int Update(object obj, ICollection<string> properties);
+
+        /// <summary>
         /// Updates all of the columns of a table using the specified object
         /// except for its primary key.
         /// The object is required to have a primary key.

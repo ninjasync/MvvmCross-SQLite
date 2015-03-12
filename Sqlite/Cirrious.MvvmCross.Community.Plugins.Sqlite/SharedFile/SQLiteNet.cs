@@ -1473,6 +1473,64 @@ namespace Community.SQLite
         }
 
         /// <summary>
+        /// Updates the specified columns of a table using the specified object
+        /// except for its primary key.
+        /// The object is required to have a primary key.
+        /// </summary>
+        /// <param name="obj">
+        /// The object to update. It must have a primary key designated using the PrimaryKeyAttribute.
+        /// </param>
+        /// <param name="properties">
+        /// the properties to update.
+        /// </param>
+        /// <returns>
+        /// The number of rows updated.
+        /// </returns>
+        public int Update(object obj, ICollection<string> properties)
+        {
+            if (obj == null)
+            {
+                return 0;
+            }
+
+            if (properties == null)
+            {
+                return Update(obj, obj.GetType());
+            }
+
+            var map = GetMapping(obj.GetType());
+
+            int rowsAffected = 0;
+
+            var pks = map.PKs;
+
+            if (pks.Count == 0)
+                throw new NotSupportedException("Cannot update " + map.TableName + ": it has no PK");
+
+            var cols = (from p in map.Columns
+                        where !p.IsPK && properties.Contains(p.PropertyName)
+                        select p)
+                       .ToList();
+
+            var vals = from c in cols
+                       select c.GetValue(obj);
+
+            var q = string.Format("update \"{0}\" set {1} {2} ", map.TableName, string.Join(",", (from c in cols
+                                                                                                  select "\"" + c.Name + "\" = ? ").ToArray()), map.GetPrimaryKeyClause());
+
+            var ps = new List<object>(vals);
+            ps.AddRange(pks.Select(pk => pk.GetValue(obj)));
+
+            rowsAffected = Execute(q, ps.ToArray());
+
+            if (rowsAffected > 0)
+                    OnTableChanged(map, NotifyTableChangedAction.Update);
+
+            return rowsAffected;
+
+        }
+
+        /// <summary>
         /// Updates all of the columns of a table using the specified object
         /// except for its primary key.
         /// The object is required to have a primary key.
@@ -2613,8 +2671,9 @@ namespace Community.SQLite
             }
             else
             {
+                string msg = SQLite3.GetErrmsg(Connection.Handle);
                 SQLite3.Reset(Statement);
-                throw SQLiteException.New(r, r.ToString());
+                throw SQLiteException.New(r, string.IsNullOrEmpty(msg)?r.ToString():msg);
             }
         }
 
