@@ -306,6 +306,10 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         T First();
 
         T FirstOrDefault();
+
+        T First(Expression<Func<T, bool>> predExpr);
+
+        T FirstOrDefault(Expression<Func<T,bool>> predExpr);
     }
 
     public interface ISQLiteCommand

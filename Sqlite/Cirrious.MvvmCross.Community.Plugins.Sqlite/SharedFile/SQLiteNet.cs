@@ -3279,6 +3279,16 @@ namespace Community.SQLite
             var query = Take(1);
             return query.ToList<T>().FirstOrDefault();
         }
+
+        public T FirstOrDefault(Expression<Func<T, bool>> predExpr)
+        {
+            return Where(predExpr).FirstOrDefault();
+        }
+
+        public T First(Expression<Func<T, bool>> predExpr)
+        {
+            return Where(predExpr).First();
+        }
     }
 
     public static class SQLite3
