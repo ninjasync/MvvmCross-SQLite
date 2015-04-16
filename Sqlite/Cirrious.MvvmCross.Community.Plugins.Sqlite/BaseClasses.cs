@@ -268,12 +268,13 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
     {
         string TableName { get; }
     }
-
+#if !DOT42
     public interface ITableQuery<T> : IEnumerable<T> where T : new()
     {
         ISQLiteConnection Connection { get; }
-
+#if !DOT42
         ITableQuery<T> Where(Expression<Func<T, bool>> predExpr);
+#endif
 
         ITableQuery<T> Take(int n);
 
@@ -282,7 +283,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         T ElementAt(int index);
 
         ITableQuery<T> Deferred();
-
+#if !DOT42
         ITableQuery<T> OrderBy<U>(Expression<Func<T, U>> orderExpr);
 
         ITableQuery<T> OrderByDescending<U>(Expression<Func<T, U>> orderExpr);
@@ -296,22 +297,23 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
             where TInner : new();
 
         ITableQuery<TResult> Select<TResult>(Expression<Func<T, TResult>> selector) where TResult : new();
-
+#endif
         int Count();
-
+#if !DOT42
         int Count(Expression<Func<T, bool>> predExpr);
-
+#endif
         IEnumerator<T> GetEnumerator();
 
         T First();
 
         T FirstOrDefault();
-
+#if !DOT42
         T First(Expression<Func<T, bool>> predExpr);
 
         T FirstOrDefault(Expression<Func<T,bool>> predExpr);
+#endif
     }
-
+#endif
     public interface ISQLiteCommand
     {
         string CommandText { get; set; }
@@ -327,9 +329,9 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         IEnumerable<T> ExecuteDeferredQuery<T>(ITableMapping map);
 
         T ExecuteScalar<T>();
-
+#if!DOT42
         void Bind(string name, object val);
-
+#endif
         void Bind(object val);
     }
 
@@ -421,7 +423,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <param name="columnName">Name of the column to index</param>
         /// <param name="unique">Whether the index should be unique</param>
         int CreateIndex(string tableName, string columnName, bool unique = false);
-
+#if !DOT42
         /// <summary>
         /// Creates an index for the specified object property.
         /// e.g. CreateIndex<Client>(c => c.Name);
@@ -430,7 +432,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <param name="property">Property to index</param>
         /// <param name="unique">Whether the index should be unique</param>
         void CreateIndex<T>(Expression<Func<T, object>> property, bool unique = false);
-
+#endif
         List<ColumnInfo> GetTableInfo(string tableName);
 
         /// <summary>
@@ -550,7 +552,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// connection must remain open for the lifetime of the enumerator.
         /// </returns>
         IEnumerable<object> DeferredQuery(ITableMapping map, string query, params object[] args);
-
+#if !DOT42
         /// <summary>
         /// Returns a queryable interface to the table represented by the given type.
         /// </summary>
@@ -559,7 +561,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// queries into native SQL.
         /// </returns>
         ITableQuery<T> Table<T>() where T : new();
-
+#endif
         /// <summary>
         /// Attempts to retrieve an object with the given primary key from the table
         /// associated with the specified type. Use of this method requires that
@@ -573,7 +575,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// if the object is not found.
         /// </returns>
         T Get<T>(object pk) where T : new();
-
+#if !DOT42
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
         /// associated with the specified type. 
@@ -586,7 +588,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// if the object is not found.
         /// </returns>
         T Get<T>(Expression<Func<T, bool>> predicate) where T : new();
-
+#endif
         /// <summary>
         /// Attempts to retrieve an object with the given primary key from the table
         /// associated with the specified type. Use of this method requires that
@@ -617,7 +619,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// if the object is not found.
         /// </returns>
         object Find(object pk, ITableMapping map);
-
+#if !DOT42
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
         /// associated with the specified type. 
@@ -630,7 +632,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// if the object is not found.
         /// </returns>
         T Find<T>(Expression<Func<T, bool>> predicate) where T : new();
-
+#endif
         /// <summary>
         /// Whether <see cref="BeginTransaction"/> has been called and the database is waiting for a <see cref="Commit"/>.
         /// </summary>
@@ -972,7 +974,11 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         private ISQLiteConnection CreateFileDb(SQLiteConnectionOptions options)
         {
             if (string.IsNullOrWhiteSpace(options.Address))
+#if !DOT42
                 throw new ArgumentException(Properties.Resources.CreateFileDbInvalidAddress);
+#else
+                throw new ArgumentException("SQLiteConnectionOptions.Address cannot be empty or null string when creating a file database.");
+#endif
             var path = options.BasePath ?? GetDefaultBasePath();
             string filePath = LocalPathCombine(path, options.Address);
             return CreateSQLiteConnection(filePath, options.StoreDateTimeAsTicks);
