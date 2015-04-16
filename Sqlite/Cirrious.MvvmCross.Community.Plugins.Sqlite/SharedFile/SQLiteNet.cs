@@ -35,7 +35,12 @@
 #define USE_NEW_REFLECTION_API
 #endif
 
+#if !DOT42
+#define FEATURE_EXPRESSIONS
+#endif
+
 using System;
+using System.Collections;
 using System.Diagnostics;
 using System.Globalization;
 #if !USE_SQLITEPCL_RAW
@@ -412,6 +417,11 @@ namespace Community.SQLite
             return CreateTable(typeof(T), createFlags);
         }
 
+        public int CreateTable<T>(string overwriteTableName, CreateFlags createFlags = CreateFlags.None)
+        {
+            return CreateTable(typeof (T), overwriteTableName, createFlags);
+        }
+
         /// <summary>
         /// Executes a "create table if not exists" on the database. It also
         /// creates any specified indexes on the columns of the table. It uses
@@ -425,6 +435,11 @@ namespace Community.SQLite
         /// </returns>
         public int CreateTable(Type ty, CreateFlags createFlags = CreateFlags.None)
         {
+            return CreateTable(ty, null, createFlags);
+        }
+
+        public int CreateTable(Type ty, string overwriteTableName, CreateFlags createFlags = CreateFlags.None)
+        {
             if (_tables == null)
             {
                 _tables = new Dictionary<string, TableMapping>();
@@ -435,7 +450,8 @@ namespace Community.SQLite
                 map = GetMapping(ty, createFlags);
                 _tables.Add(ty.FullName, map);
             }
-            var query = "create table if not exists \"" + map.TableName + "\"(\n";
+            var tableName = (overwriteTableName ?? map.TableName);
+            var query = "create table if not exists \"" + tableName + "\"(\n";
 
 		    var pkCols = map.Columns.Where(p => p.IsPK); 
 			int numPkCols = pkCols.Count(); 
@@ -455,9 +471,10 @@ namespace Community.SQLite
             var count = Execute(query);
 
             if (count == 0)
-            { //Possible bug: This always seems to return 0?
+            { 
+                //Possible bug: This always seems to return 0?
                 // Table already exists, migrate it
-                MigrateTable(map);
+                MigrateTable(map, tableName);
             }
 
             var indexes = new Dictionary<string, IndexInfo>();
@@ -465,14 +482,14 @@ namespace Community.SQLite
             {
                 foreach (var i in c.Indices)
                 {
-                    var iname = map.TableName + "_" + (i.Name ?? c.Name);
+                    var iname = tableName + "_" + (i.Name ?? c.Name);
                     IndexInfo iinfo;
                     if (!indexes.TryGetValue(iname, out iinfo))
                     {
                         iinfo = new IndexInfo
                         {
                             IndexName = iname,
-                            TableName = map.TableName,
+                            TableName = tableName,
                             Unique = i.Unique,
                             Columns = new List<IndexedColumn>()
                         };
@@ -547,7 +564,7 @@ namespace Community.SQLite
         {
             return CreateIndex(tableName + "_" + string.Join("_", columnNames), tableName, columnNames, unique);
         }
-
+#if FEATURE_EXPRESSIONS
         /// <summary>
         /// Creates an index for the specified object property.
         /// e.g. CreateIndex<Client>(c => c.Name);
@@ -579,16 +596,16 @@ namespace Community.SQLite
 
             CreateIndex(map.TableName, colName, unique);
         }
-
+#endif
         public List<ColumnInfo> GetTableInfo(string tableName)
         {
             var query = "pragma table_info(\"" + tableName + "\")";
             return Query<ColumnInfo>(query);
         }
 
-        void MigrateTable(TableMapping map)
+        void MigrateTable(TableMapping map, string trueTableName)
         {
-            var existingCols = GetTableInfo(map.TableName);
+            var existingCols = GetTableInfo(trueTableName);
 
             var toBeAdded = new List<TableMapping.Column>();
 
@@ -609,7 +626,7 @@ namespace Community.SQLite
 
             foreach (var p in toBeAdded)
             {
-                var addCol = "alter table \"" + map.TableName + "\" add column " + Orm.SqlDecl(p, StoreDateTimeAsTicks);
+                var addCol = "alter table \"" + trueTableName + "\" add column " + Orm.SqlDecl(p, StoreDateTimeAsTicks);
                 Execute(addCol);
             }
         }
@@ -816,7 +833,7 @@ namespace Community.SQLite
             var cmd = CreateCommand(query, args);
             return cmd.ExecuteDeferredQuery<object>(map);
         }
-
+#if FEATURE_EXPRESSIONS
         /// <summary>
         /// Returns a queryable interface to the table represented by the given type.
         /// </summary>
@@ -828,7 +845,7 @@ namespace Community.SQLite
         {
             return new TableQuery<T>(this);
         }
-
+#endif
         /// <summary>
         /// Attempts to retrieve an object with the given primary key from the table
         /// associated with the specified type. Use of this method requires that
@@ -847,6 +864,12 @@ namespace Community.SQLite
             return Query<T>(map.GetByPrimaryKeySql, pk).First();
         }
 
+        public T Get<T>(string overwriteTableName, object pk) where T : new()
+        {
+            var map = GetMapping(typeof(T));
+            return Query<T>(string.Format(map.GetByPrimaryKeySqlWithVariableTable, overwriteTableName??map.TableName), pk).First();
+        }
+#if FEATURE_EXPRESSIONS
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
         /// associated with the specified type. 
@@ -862,7 +885,7 @@ namespace Community.SQLite
         {
             return Table<T>().Where(predicate).First();
         }
-
+#endif
         /// <summary>
         /// Attempts to retrieve an object with the given primary key from the table
         /// associated with the specified type. Use of this method requires that
@@ -879,6 +902,12 @@ namespace Community.SQLite
         {
             var map = GetMapping(typeof(T));
             return Query<T>(map.GetByPrimaryKeySql, pk).FirstOrDefault();
+        }
+
+        public T Find<T>(string overwriteTableName, object pk) where T : new()
+        {
+            var map = GetMapping(typeof(T));
+            return Query<T>(string.Format(map.GetByPrimaryKeySqlWithVariableTable, overwriteTableName??map.TableName), pk).FirstOrDefault();
         }
 
         /// <summary>
@@ -905,7 +934,7 @@ namespace Community.SQLite
         {
             return Find(px, (TableMapping)map);
         }
-
+#if FEATURE_EXPRESSIONS
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
         /// associated with the specified type. 
@@ -921,7 +950,7 @@ namespace Community.SQLite
         {
             return Table<T>().Where(predicate).FirstOrDefault();
         }
-
+#endif
         /// <summary>
         /// Attempts to retrieve the first object that matches the query from the table
         /// associated with the specified type. 
@@ -1186,12 +1215,17 @@ namespace Community.SQLite
         /// </returns>
         public int InsertAll(System.Collections.IEnumerable objects)
         {
+            return InsertAll(null, objects);
+        }
+
+        public int InsertAll(string overwriteTableName, IEnumerable objects)
+        {
             var c = 0;
             RunInTransaction(() =>
             {
                 foreach (var r in objects)
                 {
-                    c += Insert(r);
+                    c += Insert(overwriteTableName, r);
                 }
             });
             return c;
@@ -1211,12 +1245,17 @@ namespace Community.SQLite
         /// </returns>
         public int InsertAll(System.Collections.IEnumerable objects, string extra)
         {
+            return InsertAll(null, objects, extra);
+        }
+
+        public int InsertAll(string overwriteTableName, IEnumerable objects, string extra)
+        {
             var c = 0;
             RunInTransaction(() =>
             {
                 foreach (var r in objects)
                 {
-                    c += Insert(r, extra);
+                    c += Insert(overwriteTableName, r, extra);
                 }
             });
             return c;
@@ -1266,6 +1305,15 @@ namespace Community.SQLite
             return Insert(obj, "", obj.GetType());
         }
 
+        public int Insert(string overwriteTableName, object obj)
+        {
+            if (obj == null)
+            {
+                return 0;
+            }
+            return Insert(overwriteTableName, obj, "", obj.GetType());
+        }
+
         /// <summary>
         /// Inserts the given object and retrieves its
         /// auto incremented primary key if it has one.
@@ -1286,6 +1334,11 @@ namespace Community.SQLite
                 return 0;
             }
             return Insert(obj, "OR REPLACE", obj.GetType());
+        }
+
+        public int InsertOrReplace(string overwriteTableName, object obj)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -1349,6 +1402,15 @@ namespace Community.SQLite
             return Insert(obj, extra, obj.GetType());
         }
 
+        public int Insert(string overwriteTableName, object obj, string extra)
+        {
+            if (obj == null)
+            {
+                return 0;
+            }
+            return Insert(overwriteTableName, obj, extra, obj.GetType());
+        }
+
         /// <summary>
         /// Inserts the given object and retrieves its
         /// auto incremented primary key if it has one.
@@ -1367,11 +1429,15 @@ namespace Community.SQLite
         /// </returns>
         public int Insert(object obj, string extra, Type objType)
         {
+            return Insert(null, obj, extra, objType);
+        }
+
+        public int Insert(string overwriteTableName, object obj, string extra, Type objType)
+        {
             if (obj == null || objType == null)
             {
                 return 0;
             }
-
 
             var map = GetMapping(objType);
 
@@ -1424,7 +1490,7 @@ namespace Community.SQLite
                 vals[i] = cols[i].GetValue(obj);
             }
 
-            var insertCmd = map.GetInsertCommand(this, extra);
+            var insertCmd = map.GetInsertCommand(this, overwriteTableName, extra);
             int count;
 
             try
@@ -1472,6 +1538,15 @@ namespace Community.SQLite
             return Update(obj, obj.GetType());
         }
 
+        public int Update(string overwriteTableName, object obj)
+        {
+            if (obj == null)
+            {
+                return 0;
+            }
+            return Update(overwriteTableName, obj, obj.GetType());
+        }
+
         /// <summary>
         /// Updates the specified columns of a table using the specified object
         /// except for its primary key.
@@ -1488,6 +1563,11 @@ namespace Community.SQLite
         /// </returns>
         public int Update(object obj, ICollection<string> properties)
         {
+            return Update(null, obj, properties);
+        }
+
+        public int Update(string overwriteTableName, object obj, ICollection<string> properties)
+        {
             if (obj == null)
             {
                 return 0;
@@ -1495,17 +1575,18 @@ namespace Community.SQLite
 
             if (properties == null)
             {
-                return Update(obj, obj.GetType());
+                return Update(overwriteTableName, obj, obj.GetType());
             }
 
             var map = GetMapping(obj.GetType());
+            var tableName = overwriteTableName ?? map.TableName;
 
             int rowsAffected = 0;
 
             var pks = map.PKs;
 
             if (pks.Count == 0)
-                throw new NotSupportedException("Cannot update " + map.TableName + ": it has no PK");
+                throw new NotSupportedException("Cannot update " + tableName + ": it has no PK");
 
             var cols = (from p in map.Columns
                         where !p.IsPK && properties.Contains(p.PropertyName)
@@ -1515,7 +1596,7 @@ namespace Community.SQLite
             var vals = from c in cols
                        select c.GetValue(obj);
 
-            var q = string.Format("update \"{0}\" set {1} {2} ", map.TableName, string.Join(",", (from c in cols
+            var q = string.Format("update \"{0}\" set {1} {2} ", tableName, string.Join(",", (from c in cols
                                                                                                   select "\"" + c.Name + "\" = ? ").ToArray()), map.GetPrimaryKeyClause());
 
             var ps = new List<object>(vals);
@@ -1546,6 +1627,11 @@ namespace Community.SQLite
         /// </returns>
         public int Update(object obj, Type objType)
         {
+            return Update(null, obj, objType);
+        }
+
+        public int Update(string overwriteTableName, object obj, Type objType)
+        {
             int rowsAffected = 0;
             if (obj == null || objType == null)
             {
@@ -1553,12 +1639,13 @@ namespace Community.SQLite
             }
 
             var map = GetMapping(objType);
+            var tableName = overwriteTableName ?? map.TableName;
 
             var pks = map.PKs;
 
             if (pks.Count == 0)
             {
-                throw new NotSupportedException("Cannot update " + map.TableName + ": it has no PK");
+                throw new NotSupportedException("Cannot update " + tableName + ": it has no PK");
             }
 
             var cols = from p in map.Columns
@@ -1567,7 +1654,7 @@ namespace Community.SQLite
             var vals = from c in cols
                        select c.GetValue(obj);
 
-            var q = string.Format("update \"{0}\" set {1} {2} ", map.TableName, string.Join(",", (from c in cols
+            var q = string.Format("update \"{0}\" set {1} {2} ", tableName, string.Join(",", (from c in cols
                                                                                                   select "\"" + c.Name + "\" = ? ").ToArray()), map.GetPrimaryKeyClause());
 
             var ps = new List<object>(vals);
@@ -1598,7 +1685,7 @@ namespace Community.SQLite
         /// Updates all specified objects.
         /// </summary>
         /// <param name="objects">
-        /// An <see cref="IEnumerable"/> of the objects to insert.
+        /// An <see cref="IEnumerable"/> of the objects to update.
         /// </param>
         /// <returns>
         /// The number of rows modified.
@@ -1627,15 +1714,21 @@ namespace Community.SQLite
         /// </returns>
         public int Delete(object objectToDelete)
         {
+            return Delete(null, objectToDelete);
+        }
+
+        public int Delete(string overwriteTableName, object objectToDelete)
+        {
             var map = GetMapping(objectToDelete.GetType());
-			var pks = map.PKs; 
-			if (pks.Count == 0) 
+            var tableName = overwriteTableName ?? map.TableName;
+            var pks = map.PKs;
+            if (pks.Count == 0)
             {
-                throw new NotSupportedException("Cannot delete " + map.TableName + ": it has no PK");
+                throw new NotSupportedException("Cannot delete " + tableName + ": it has no PK");
             }
 
-		    var q = string.Format ("delete from \"{0}\" {1}", map.TableName, map.GetPrimaryKeyClause()); 
-			var count = Execute (q, pks.Select(pk => pk.GetValue (objectToDelete)).ToArray()); 
+            var q = string.Format("delete from \"{0}\" {1}", tableName, map.GetPrimaryKeyClause());
+            var count = Execute(q, pks.Select(pk => pk.GetValue(objectToDelete)).ToArray());
 
             if (count > 0)
                 OnTableChanged(map, NotifyTableChangedAction.Delete);
@@ -1656,17 +1749,24 @@ namespace Community.SQLite
         /// </typeparam>
         public int Delete<T>(object primaryKey)
         {
+            return Delete(null, primaryKey);
+        }
+
+        public int Delete<T>(string overwriteTableName, object primaryKey)
+        {
             var map = GetMapping(typeof(T));
-			var pks = map.PKs; 
-			if (pks.Count == 0) 
+            var tableName = overwriteTableName ?? map.TableName;
+
+            var pks = map.PKs;
+            if (pks.Count == 0)
             {
-                throw new NotSupportedException("Cannot delete " + map.TableName + ": it has no PK");
+                throw new NotSupportedException("Cannot delete " + tableName + ": it has no PK");
             }
-			if (pks.Count > 1) 
-            { 
-				throw new NotSupportedException("Cannot delete " + map.TableName + ": it has > 1 PK"); 
-			} 
-			var q = string.Format ("delete from \"{0}\" {1}", map.TableName, map.GetPrimaryKeyClause()); 
+            if (pks.Count > 1)
+            {
+                throw new NotSupportedException("Cannot delete " + tableName + ": it has > 1 PK");
+            }
+            var q = string.Format("delete from \"{0}\" {1}", tableName, map.GetPrimaryKeyClause());
 
             var count = Execute(q, primaryKey);
             if (count > 0)
@@ -1805,6 +1905,7 @@ namespace Community.SQLite
         public List<Column> PKs { get; private set; }
 
         public string GetByPrimaryKeySql { get; private set; }
+        public string GetByPrimaryKeySqlWithVariableTable { get; private set; }
 
         Column _autoPk;
         Column[] _insertColumns;
@@ -1862,11 +1963,13 @@ namespace Community.SQLite
             if (PKs.Count > 0)
             {
                 GetByPrimaryKeySql = string.Format("select * from \"{0}\" {1}", TableName, GetPrimaryKeyClause());
+                GetByPrimaryKeySqlWithVariableTable = string.Format("select * from \"{0}\" {1}", "{0}", GetPrimaryKeyClause());
             }
             else
             {
                 // People should not be calling Get/Find without a PK
                 GetByPrimaryKeySql = string.Format("select * from \"{0}\" limit 1", TableName);
+                GetByPrimaryKeySqlWithVariableTable = "select * from \"{0}\" limit 1";
             }
         }
 
@@ -1932,32 +2035,35 @@ namespace Community.SQLite
             return exact;
         }
 
-        PreparedSqlLiteInsertCommand _insertCommand;
-        string _insertCommandExtra;
+        private PreparedSqlLiteInsertCommand _insertCommand;
+        private string _insertCommandExtra;
+        private string _insertCommandTableName;
 
-        public PreparedSqlLiteInsertCommand GetInsertCommand(SQLiteConnection conn, string extra)
+        public PreparedSqlLiteInsertCommand GetInsertCommand(SQLiteConnection conn, string overwriteTableName, string extra)
         {
             if (_insertCommand == null)
             {
-                _insertCommand = CreateInsertCommand(conn, extra);
+                _insertCommand = CreateInsertCommand(conn, overwriteTableName, extra);
                 _insertCommandExtra = extra;
+                _insertCommandTableName = overwriteTableName;
             }
-            else if (_insertCommandExtra != extra)
+            else if (_insertCommandExtra != extra || _insertCommandTableName != overwriteTableName)
             {
                 _insertCommand.Dispose();
-                _insertCommand = CreateInsertCommand(conn, extra);
+                _insertCommand = CreateInsertCommand(conn, overwriteTableName, extra);
                 _insertCommandExtra = extra;
+                _insertCommandTableName = overwriteTableName;
             }
             return _insertCommand;
         }
 
-        public PreparedSqlLiteInsertCommand CreateInsertCommand(SQLiteConnection conn, string extra)
+        public PreparedSqlLiteInsertCommand CreateInsertCommand(SQLiteConnection conn, string overwriteTableName, string extra)
         {
             var cols = InsertColumns;
             string insertSql;
             if (!cols.Any() && Columns.Count() == 1 && Columns[0].IsAutoInc)
             {
-                insertSql = string.Format("insert {1} into \"{0}\" default values", TableName, extra);
+                insertSql = string.Format("insert {1} into \"{0}\" default values", overwriteTableName ?? TableName, extra);
             }
             else
             {
@@ -1968,7 +2074,7 @@ namespace Community.SQLite
                     cols = InsertOrReplaceColumns;
                 }
 
-                insertSql = string.Format("insert {3} into \"{0}\"({1}) values ({2})", TableName,
+                insertSql = string.Format("insert {3} into \"{0}\"({1}) values ({2})", overwriteTableName ?? TableName,
                                    string.Join(",", (from c in cols
                                                      select "\"" + c.Name + "\"").ToArray()),
                                    string.Join(",", (from c in cols
@@ -2212,7 +2318,7 @@ namespace Community.SQLite
 #endif
         }
     }
-
+#if !DOT42
     public partial class SQLiteCommand : ISQLiteCommand
     {
         SQLiteConnection _conn;
@@ -2710,7 +2816,7 @@ namespace Community.SQLite
             Dispose(false);
         }
     }
-
+#endif
     public abstract class BaseTableQuery
     {
         protected class Ordering
@@ -2719,7 +2825,7 @@ namespace Community.SQLite
             public bool Ascending { get; set; }
         }
     }
-
+#if FEATURE_EXPRESSIONS
     public class TableQuery<T> : BaseTableQuery, ITableQuery<T> where T : new()
     {
         public SQLiteConnection Connection { get; private set; }
@@ -3290,7 +3396,7 @@ namespace Community.SQLite
             return Where(predExpr).First();
         }
     }
-
+#endif
     public static class SQLite3
     {
         public enum Result : int
@@ -3384,8 +3490,8 @@ namespace Community.SQLite
             MultiThread = 2,
             Serialized = 3
         }
-
-#if !USE_CSHARP_SQLITE && !USE_WP8_NATIVE_SQLITE && !USE_SQLITEPCL_RAW
+#if !DOT42
+#if !USE_CSHARP_SQLITE && !USE_WP8_NATIVE_SQLITE && !USE_SQLITEPCL_RAW 
         [DllImport("sqlite3", EntryPoint = "sqlite3_threadsafe", CallingConvention = CallingConvention.Cdecl)]
         public static extern int Threadsafe();
 
@@ -3751,4 +3857,5 @@ namespace Community.SQLite
             Null = 5
         }
     }
+#endif // DOT42
 }

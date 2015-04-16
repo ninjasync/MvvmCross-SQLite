@@ -5,10 +5,15 @@
 // 
 // Project Lead - Stuart Lodge, @slodge, me@slodge.com
 
+#if !DOT42
+#define FEATURE_EXPRESSIONS
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using SQLiteOpenFlags = System.Int16;
+
 
 namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
 {
@@ -268,13 +273,12 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
     {
         string TableName { get; }
     }
-#if !DOT42
+#if FEATURE_EXPRESSIONS
     public interface ITableQuery<T> : IEnumerable<T> where T : new()
     {
         ISQLiteConnection Connection { get; }
-#if !DOT42
+
         ITableQuery<T> Where(Expression<Func<T, bool>> predExpr);
-#endif
 
         ITableQuery<T> Take(int n);
 
@@ -283,7 +287,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         T ElementAt(int index);
 
         ITableQuery<T> Deferred();
-#if !DOT42
+
         ITableQuery<T> OrderBy<U>(Expression<Func<T, U>> orderExpr);
 
         ITableQuery<T> OrderByDescending<U>(Expression<Func<T, U>> orderExpr);
@@ -297,23 +301,24 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
             where TInner : new();
 
         ITableQuery<TResult> Select<TResult>(Expression<Func<T, TResult>> selector) where TResult : new();
-#endif
+
         int Count();
-#if !DOT42
+
         int Count(Expression<Func<T, bool>> predExpr);
-#endif
+
         IEnumerator<T> GetEnumerator();
 
         T First();
 
         T FirstOrDefault();
-#if !DOT42
+
         T First(Expression<Func<T, bool>> predExpr);
 
         T FirstOrDefault(Expression<Func<T,bool>> predExpr);
-#endif
+
     }
 #endif
+
     public interface ISQLiteCommand
     {
         string CommandText { get; set; }
@@ -329,7 +334,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         IEnumerable<T> ExecuteDeferredQuery<T>(ITableMapping map);
 
         T ExecuteScalar<T>();
-#if!DOT42
+#if !DOT42
         void Bind(string name, object val);
 #endif
         void Bind(object val);
@@ -393,6 +398,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of entries added to the database schema.
         /// </returns>
         int CreateTable<T>(CreateFlags createFlags = CreateFlags.None);
+        int CreateTable<T>(string overwriteTableName, CreateFlags createFlags = CreateFlags.None);
 
         /// <summary>
         /// Executes a "create table if not exists" on the database. It also
@@ -406,6 +412,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of entries added to the database schema.
         /// </returns>
         int CreateTable(Type ty, CreateFlags createFlags = CreateFlags.None);
+        int CreateTable(Type ty, string overwriteTableName, CreateFlags createFlags = CreateFlags.None);
 
         /// <summary>
         /// Creates an index for the specified table and column.
@@ -423,7 +430,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <param name="columnName">Name of the column to index</param>
         /// <param name="unique">Whether the index should be unique</param>
         int CreateIndex(string tableName, string columnName, bool unique = false);
-#if !DOT42
+#if FEATURE_EXPRESSIONS
         /// <summary>
         /// Creates an index for the specified object property.
         /// e.g. CreateIndex<Client>(c => c.Name);
@@ -552,7 +559,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// connection must remain open for the lifetime of the enumerator.
         /// </returns>
         IEnumerable<object> DeferredQuery(ITableMapping map, string query, params object[] args);
-#if !DOT42
+#if FEATURE_EXPRESSIONS
         /// <summary>
         /// Returns a queryable interface to the table represented by the given type.
         /// </summary>
@@ -575,7 +582,8 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// if the object is not found.
         /// </returns>
         T Get<T>(object pk) where T : new();
-#if !DOT42
+        T Get<T>(string overwriteTableName, object pk) where T : new();
+#if FEATURE_EXPRESSIONS
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
         /// associated with the specified type. 
@@ -602,6 +610,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// if the object is not found.
         /// </returns>
         T Find<T>(object pk) where T : new();
+        T Find<T>(string overwriteTableName, object pk) where T : new();
 
         /// <summary>
         /// Attempts to retrieve an object with the given primary key from the table
@@ -619,7 +628,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// if the object is not found.
         /// </returns>
         object Find(object pk, ITableMapping map);
-#if !DOT42
+#if FEATURE_EXPRESSIONS
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
         /// associated with the specified type. 
@@ -703,6 +712,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows added to the table.
         /// </returns>
         int InsertAll(System.Collections.IEnumerable objects);
+        int InsertAll(string overwriteTableName, System.Collections.IEnumerable objects);
 
         /// <summary>
         /// Inserts all specified objects.
@@ -717,7 +727,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows added to the table.
         /// </returns>
         int InsertAll(System.Collections.IEnumerable objects, string extra);
-
+        int InsertAll(string overwriteTableName, System.Collections.IEnumerable objects, string extra);
         /// <summary>
         /// Inserts all specified objects.
         /// </summary>
@@ -743,6 +753,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows added to the table.
         /// </returns>
         int Insert(object obj);
+        int Insert(string overwriteTableName, object obj);
 
         /// <summary>
         /// Inserts the given object and retrieves its
@@ -758,6 +769,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows modified.
         /// </returns>
         int InsertOrReplace(object obj);
+        int InsertOrReplace(string overwriteTableName, object obj);
 
         /// <summary>
         /// Inserts the given object and retrieves its
@@ -806,6 +818,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows added to the table.
         /// </returns>
         int Insert(object obj, string extra);
+        int Insert(string overwriteTableName, object obj, string extra);
 
         /// <summary>
         /// Inserts the given object and retrieves its
@@ -837,6 +850,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows updated.
         /// </returns>
         int Update(object obj);
+        int Update(string overwriteTableName, object obj);
 
         /// <summary>
         /// Updates the specified columns of a table using the specified object
@@ -853,6 +867,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows updated.
         /// </returns>
         int Update(object obj, ICollection<string> properties);
+        int Update(string overwriteTableName, object obj, ICollection<string> properties);
 
         /// <summary>
         /// Updates all of the columns of a table using the specified object
@@ -891,6 +906,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows deleted.
         /// </returns>
         int Delete(object objectToDelete);
+        int Delete(string overwriteTableName, object objectToDelete);
 
         /// <summary>
         /// Deletes the object with the specified primary key.
@@ -905,6 +921,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The type of object.
         /// </typeparam>
         int Delete<T>(object primaryKey);
+        int Delete<T>(string overwriteTableName, object primaryKey);
 
         /// <summary>
         /// Deletes all the objects from the specified table.
