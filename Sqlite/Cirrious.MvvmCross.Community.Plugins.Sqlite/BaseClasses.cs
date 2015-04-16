@@ -9,6 +9,8 @@
 #define FEATURE_EXPRESSIONS
 #endif
 
+#define FEATURE_NXTABLEQUERY
+
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -287,10 +289,11 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         T ElementAt(int index);
 
         ITableQuery<T> Deferred();
-
+        
         ITableQuery<T> OrderBy<U>(Expression<Func<T, U>> orderExpr);
-
         ITableQuery<T> OrderByDescending<U>(Expression<Func<T, U>> orderExpr);
+        ITableQuery<T> ThenBy<U>(Expression<Func<T, U>> orderExpr);
+        ITableQuery<T> ThenByDescending<U>(Expression<Func<T, U>> orderExpr);
 
         ITableQuery<TResult> Join<TInner, TKey, TResult>(
             ITableQuery<TInner> inner,
@@ -318,6 +321,36 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
 
     }
 #endif
+
+#if FEATURE_NXTABLEQUERY
+    public interface INxTableQuery<out T> : IEnumerable<T> where T : new()
+    {
+        ISQLiteConnection Connection { get; }
+        ITableMapping Table { get; }
+        INxTableQuery<U> Clone<U>() where U : new();
+
+        /// <summary>
+        /// can be used multiple times, all clauses are combined with "AND"
+        /// </summary>
+        INxTableQuery<T> Where(string where);
+
+        /// <summary>
+        /// can be used multiple times, all clauses are combined with "AND"
+        /// </summary>
+        INxTableQuery<T> Where(string where, params object[] args);
+
+        INxTableQuery<T> Take(int n);
+        INxTableQuery<T> Skip(int n);
+        T ElementAt(int index);
+        INxTableQuery<T> Deferred();
+        INxTableQuery<T> OrderBy(string orderBy);
+        INxTableQuery<TResult> Select<TResult>(string selector) where TResult : new();
+        int Count();
+        T First();
+        T FirstOrDefault();
+    }
+#endif
+
 
     public interface ISQLiteCommand
     {
@@ -568,6 +601,19 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// queries into native SQL.
         /// </returns>
         ITableQuery<T> Table<T>() where T : new();
+        ITableQuery<T> Table<T>(string overwriteTableName) where T : new();
+#endif
+#if FEATURE_NXTABLEQUERY
+        /// <summary>
+        /// Returns a non-expressions queryable interface to the table 
+        /// represented by the given type.
+        /// </summary>
+        /// <returns>
+        /// A queryable object that is able to translate Where, OrderBy, and Take
+        /// queries into native SQL.
+        /// </returns>
+        INxTableQuery<T> NxTable<T>() where T : new();
+        INxTableQuery<T> NxTable<T>(string overwriteTableName) where T : new();
 #endif
         /// <summary>
         /// Attempts to retrieve an object with the given primary key from the table

@@ -47,8 +47,9 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Include="SharedFile\SQLiteNet.cs" />
-    <Compile Include="SharedFile\SQLiteAsync.cs" />
+    <None Include="SharedFile\NxTableQuery.cs" />
+    <None Include="SharedFile\SQLiteNet.cs" />
+    <None Include="SharedFile\SQLiteAsync.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">

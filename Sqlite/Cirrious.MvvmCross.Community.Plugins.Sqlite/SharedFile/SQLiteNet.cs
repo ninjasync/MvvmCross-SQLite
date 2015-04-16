@@ -39,6 +39,8 @@
 #define FEATURE_EXPRESSIONS
 #endif
 
+#define FEATURE_NXTABLEQUERY
+
 using System;
 using System.Collections;
 using System.Diagnostics;
@@ -897,6 +899,30 @@ namespace Community.SQLite
         public ITableQuery<T> Table<T>() where T : new()
         {
             return new TableQuery<T>(this);
+        }
+
+        public ITableQuery<T> Table<T>(string overwriteTableName) where T : new()
+        {
+            return new TableQuery<T>(this, overwriteTableName);
+        }
+#endif
+#if FEATURE_NXTABLEQUERY
+        /// <summary>
+        /// Returns a non-expresions query assist interface to the table represented 
+        /// by the given type.
+        /// </summary>
+        /// <returns>
+        /// A queryable object that is able to translate Where, OrderBy, and Take
+        /// queries into native SQL.
+        /// </returns>
+        public INxTableQuery<T> NxTable<T>() where T : new()
+        {
+            return new NxTableQuery<T>(this);
+        }
+
+        public INxTableQuery<T> NxTable<T>(string overwriteTableName) where T : new()
+        {
+            return new NxTableQuery<T>(this, overwriteTableName);
         }
 #endif
         /// <summary>
@@ -2959,6 +2985,7 @@ namespace Community.SQLite
 
         public TableMapping Table { get; private set; }
 
+        string _overwriteTableName;
         Expression _where;
         List<Ordering> _orderBys;
         int? _limit;
@@ -2984,9 +3011,16 @@ namespace Community.SQLite
             Table = Connection.GetMapping(typeof(T));
         }
 
+        public TableQuery(SQLiteConnection conn, string overwriteTableName)
+                : this(conn)
+        {
+            _overwriteTableName = overwriteTableName;
+        }
+
         public TableQuery<U> Clone<U>() where U : new()
         {
             var q = new TableQuery<U>(Connection, Table);
+            q._overwriteTableName = _overwriteTableName;
             q._where = _where;
             q._deferred = _deferred;
             if (_orderBys != null)
@@ -3057,12 +3091,12 @@ namespace Community.SQLite
             return AddOrderBy<U>(orderExpr, false);
         }
 
-        public TableQuery<T> ThenBy<U>(Expression<Func<T, U>> orderExpr)
+        public ITableQuery<T> ThenBy<U>(Expression<Func<T, U>> orderExpr)
         {
             return AddOrderBy<U>(orderExpr, true);
         }
 
-        public TableQuery<T> ThenByDescending<U>(Expression<Func<T, U>> orderExpr)
+        public ITableQuery<T> ThenByDescending<U>(Expression<Func<T, U>> orderExpr)
         {
             return AddOrderBy<U>(orderExpr, false);
         }
@@ -3156,7 +3190,7 @@ namespace Community.SQLite
             }
             else
             {
-                var cmdText = "select " + selectionList + " from \"" + Table.TableName + "\"";
+                var cmdText = "select " + selectionList + " from \"" + (_overwriteTableName??Table.TableName) + "\"";
                 var args = new List<object>();
                 if (_where != null)
                 {
