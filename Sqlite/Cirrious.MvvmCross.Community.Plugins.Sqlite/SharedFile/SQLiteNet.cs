@@ -65,6 +65,12 @@ using Sqlite3Statement = Sqlite.Statement;
 using Sqlite3DatabaseHandle = SQLitePCL.sqlite3;
 using Sqlite3Statement = SQLitePCL.sqlite3_stmt;
 using Sqlite3 = SQLitePCL.raw;
+#elif DOT42
+using Android.Database;
+using Android.Database.Sqlite;
+using Java.Util.Concurrent.Atomic;
+using Sqlite3DatabaseHandle = Android.Database.Sqlite.SQLiteDatabase;
+using Sqlite3Statement = Android.Database.Sqlite.SQLiteStatement;
 #else
 using Sqlite3DatabaseHandle = System.IntPtr;
 using Sqlite3Statement = System.IntPtr;
@@ -119,6 +125,38 @@ namespace Community.SQLite
         {
             return new SQLiteException(r, message);
         }
+
+#if DOT42
+        protected SQLiteException(SQLite3.Result r, SQLException ex)
+            : base(ex.Message, ex)
+        {
+            Result = r;
+        }
+
+
+        public static SQLiteException New(SQLException ex)
+        {
+            SQLite3.Result result =
+                (ex is SQLiteAbortException) ? SQLite3.Result.Abort
+               :(ex is SQLiteAccessPermException) ? SQLite3.Result.AccessDenied
+               :(ex is SQLiteBindOrColumnIndexOutOfRangeException) ? SQLite3.Result.Range
+               :(ex is SQLiteBlobTooBigException) ? SQLite3.Result.TooBig
+               :(ex is SQLiteCantOpenDatabaseException) ? SQLite3.Result.CannotOpen
+               :(ex is SQLiteConstraintException) ? SQLite3.Result.Constraint
+               :(ex is SQLiteDatabaseCorruptException) ? SQLite3.Result.Corrupt
+               :(ex is SQLiteDatabaseLockedException) ? SQLite3.Result.Locked
+               :(ex is SQLiteDatatypeMismatchException) ? SQLite3.Result.Mismatch
+               :(ex is SQLiteDiskIOException) ? SQLite3.Result.IOError
+               :(ex is SQLiteDoneException) ? SQLite3.Result.Done
+               :(ex is SQLiteFullException) ? SQLite3.Result.Full
+               :(ex is SQLiteMisuseException) ? SQLite3.Result.Misuse
+               :(ex is SQLiteOutOfMemoryException) ? SQLite3.Result.NoMem
+               :(ex is SQLiteReadOnlyDatabaseException) ? SQLite3.Result.ReadOnly
+               :(ex is  SQLiteTableLockedException) ? SQLite3.Result.Locked
+               : SQLite3.Result.Error;
+            return new SQLiteException(result, ex);
+        }
+#endif
     }
 
     public class NotNullConstraintViolationException : SQLiteException
@@ -182,11 +220,18 @@ namespace Community.SQLite
         private System.Diagnostics.Stopwatch _sw;
         private long _elapsedMilliseconds = 0;
 
+#if !DOT42
         private int _transactionDepth = 0;
+#else
+        private AtomicInteger _transactionDepth = new AtomicInteger();
+#endif
         private Random _rand = new Random();
 
         public Sqlite3DatabaseHandle Handle { get; private set; }
         internal static readonly Sqlite3DatabaseHandle NullHandle = default(Sqlite3DatabaseHandle);
+#if DOT42
+        internal static readonly Java.Lang.ThreadLocal<SQLiteStatement> LastRowIdStatement = new Java.Lang.ThreadLocal<SQLiteStatement>();
+#endif
 
         public string DatabasePath { get; private set; }
 
@@ -235,7 +280,7 @@ namespace Community.SQLite
 #if NETFX_CORE
 			SQLite3.SetDirectory(/*temp directory type*/2, Windows.Storage.ApplicationData.Current.TemporaryFolder.Path);
 #endif
-
+#if !DOT42
             Sqlite3DatabaseHandle handle;
 
 #if SILVERLIGHT || USE_CSHARP_SQLITE || USE_SQLITEPCL_RAW
@@ -253,6 +298,9 @@ namespace Community.SQLite
             {
                 throw SQLiteException.New(r, String.Format("Could not open database file: {0} ({1})", DatabasePath, r));
             }
+#else // DOT42
+            Handle = DatabaseFactory.Open(databasePath, openFlags);
+#endif
             _open = true;
 
             StoreDateTimeAsTicks = storeDateTimeAsTicks;
@@ -276,7 +324,7 @@ namespace Community.SQLite
 		static bool _preserveDuringLinkMagic;
 #endif
 
-#if !USE_SQLITEPCL_RAW
+#if !USE_SQLITEPCL_RAW && !DOT42
         public void EnableLoadExtension(int onoff)
         {
             SQLite3.Result r = SQLite3.EnableLoadExtension(Handle, onoff);
@@ -288,7 +336,7 @@ namespace Community.SQLite
         }
 #endif
 
-#if !USE_SQLITEPCL_RAW
+#if !USE_SQLITEPCL_RAW && !DOT42
         static byte[] GetNullTerminatedUtf8(string s)
         {
             var utf8Length = System.Text.Encoding.UTF8.GetByteCount(s);
@@ -308,9 +356,14 @@ namespace Community.SQLite
             set
             {
                 _busyTimeout = value;
+
                 if (Handle != NullHandle)
                 {
+#if !DOT42
                     SQLite3.BusyTimeout(Handle, (int)_busyTimeout.TotalMilliseconds);
+#else
+                    Handle.ExecSQL("pragma busy_timeout = " + _busyTimeout.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture) + ";");
+#endif
                 }
             }
         }
@@ -869,6 +922,7 @@ namespace Community.SQLite
             var map = GetMapping(typeof(T));
             return Query<T>(string.Format(map.GetByPrimaryKeySqlWithVariableTable, overwriteTableName??map.TableName), pk).First();
         }
+
 #if FEATURE_EXPRESSIONS
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
@@ -934,6 +988,7 @@ namespace Community.SQLite
         {
             return Find(px, (TableMapping)map);
         }
+
 #if FEATURE_EXPRESSIONS
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
@@ -975,7 +1030,11 @@ namespace Community.SQLite
         /// </summary>
         public bool IsInTransaction
         {
+#if !DOT42
             get { return _transactionDepth > 0; }
+#else
+            get { return _transactionDepth.Get() > 0; }
+#endif
         }
 
         /// <summary>
@@ -990,7 +1049,11 @@ namespace Community.SQLite
             //    then the command fails with an error.
             // Rather than crash with an error, we will just ignore calls to BeginTransaction
             //    that would result in an error.
+#if !DOT42
             if (Interlocked.CompareExchange(ref _transactionDepth, 1, 0) == 0)
+#else
+            if (_transactionDepth.CompareAndSet(1, 0))
+#endif
             {
                 try
                 {
@@ -1019,7 +1082,11 @@ namespace Community.SQLite
                     {
                         // Call decrement and not VolatileWrite in case we've already 
                         //    created a transaction point in SaveTransactionPoint since the catch.
+#if !DOT42
                         Interlocked.Decrement(ref _transactionDepth);
+#else
+                        _transactionDepth.DecrementAndGet();
+#endif
                     }
 
                     throw;
@@ -1043,7 +1110,11 @@ namespace Community.SQLite
         /// <returns>A string naming the savepoint.</returns>
         public string SaveTransactionPoint()
         {
+#if !DOT42
             int depth = Interlocked.Increment(ref _transactionDepth) - 1;
+#else
+            int depth = _transactionDepth.GetAndIncrement();
+#endif
             string retVal = "S" + _rand.Next(short.MaxValue) + "D" + depth;
 
             try
@@ -1071,7 +1142,11 @@ namespace Community.SQLite
                 }
                 else
                 {
+#if !DOT42
                     Interlocked.Decrement(ref _transactionDepth);
+#else
+                    _transactionDepth.DecrementAndGet();
+#endif
                 }
 
                 throw;
@@ -1109,7 +1184,11 @@ namespace Community.SQLite
             {
                 if (String.IsNullOrEmpty(savepoint))
                 {
+#if !DOT42
                     if (Interlocked.Exchange(ref _transactionDepth, 0) > 0)
+#else
+                    if (_transactionDepth.GetAndSet(0) > 0)
+#endif
                     {
                         Execute("rollback");
                     }
@@ -1150,6 +1229,7 @@ namespace Community.SQLite
                 int depth;
                 if (Int32.TryParse(savepoint.Substring(firstLen + 1), out depth))
                 {
+#if !DOT42
                     // TODO: Mild race here, but inescapable without locking almost everywhere.
                     if (0 <= depth && depth < _transactionDepth)
                     {
@@ -1157,6 +1237,11 @@ namespace Community.SQLite
 						_transactionDepth = depth;
 #else
                         Volatile.Write(ref _transactionDepth, depth);
+#endif
+#else
+                    if (0 <= depth && depth < _transactionDepth.Get())
+                    {
+                        _transactionDepth.Set(depth);
 #endif
                         Execute(cmd + savepoint);
                         return;
@@ -1172,7 +1257,11 @@ namespace Community.SQLite
         /// </summary>
         public void Commit()
         {
+#if !DOT42
             if (Interlocked.Exchange(ref _transactionDepth, 0) != 0)
+#else
+            if (_transactionDepth.GetAndSet(0) != 0)
+#endif
             {
                 Execute("commit");
             }
@@ -1492,7 +1581,7 @@ namespace Community.SQLite
 
             var insertCmd = map.GetInsertCommand(this, overwriteTableName, extra);
             int count;
-
+#if !DOT42
             try
             {
                 count = insertCmd.ExecuteNonQuery(vals);
@@ -1505,10 +1594,16 @@ namespace Community.SQLite
                 }
                 throw;
             }
-
+#else
+            count = insertCmd.ExecuteNonQuery(vals);
+#endif
             if (map.HasAutoIncPK)
             {
+#if !DOT42
                 var id = SQLite3.LastInsertRowid(Handle);
+#else
+                var id = GetLastRowId();
+#endif
                 map.SetAutoIncPK(obj, id);
             }
 
@@ -1517,6 +1612,20 @@ namespace Community.SQLite
 
             return count;
         }
+
+#if DOT42
+        private long GetLastRowId()
+        {
+            var lastRowId = LastRowIdStatement.Get();
+            if (lastRowId == null)
+            {
+                lastRowId = Handle.CompileStatement("SELECT last_insert_rowid();");
+                LastRowIdStatement.Set(lastRowId);
+            }
+            
+            return lastRowId.SimpleQueryForLong();
+        }
+#endif
 
         /// <summary>
         /// Updates all of the columns of a table using the specified object
@@ -1659,7 +1768,7 @@ namespace Community.SQLite
 
             var ps = new List<object>(vals);
             ps.AddRange(pks.Select(pk => pk.GetValue(obj)));
-
+#if !DOT42
             try
             {
                 rowsAffected = Execute(q, ps.ToArray());
@@ -1674,7 +1783,9 @@ namespace Community.SQLite
 
                 throw ex;
             }
-
+#else
+            rowsAffected = Execute(q, ps.ToArray());
+#endif
             if (rowsAffected > 0)
                 OnTableChanged(map, NotifyTableChangedAction.Update);
 
@@ -1817,6 +1928,7 @@ namespace Community.SQLite
             {
                 try
                 {
+#if !DOT42
                     if (_mappings != null)
                     {
                         foreach (var sqlInsertCommand in _mappings.Values)
@@ -1830,6 +1942,9 @@ namespace Community.SQLite
                         string msg = SQLite3.GetErrmsg(Handle);
                         throw SQLiteException.New(r, msg);
                     }
+#else
+                    DatabaseFactory.Close(Handle);
+#endif
                 }
                 finally
                 {
@@ -1973,21 +2088,25 @@ namespace Community.SQLite
             }
         }
 
-		public string GetPrimaryKeyClause() 
-		{ 
-			string clause = String.Empty; 
-			bool first = true; 
-			foreach (Column pk in PKs) { 
-				if (first) { 
-					clause += "where "; 
-					first = false; 
-				} else { 
-					clause += " and "; 
-				} 
-				clause += string.Format("\"{0}\" = ?", pk.Name); 
-			} 
-			return clause; 
-		} 
+        public string GetPrimaryKeyClause()
+        {
+            string clause = String.Empty;
+            bool first = true;
+            foreach (Column pk in PKs)
+            {
+                if (first)
+                {
+                    clause += "where ";
+                    first = false;
+                }
+                else
+                {
+                    clause += " and ";
+                }
+                clause += string.Format("\"{0}\" = ?", pk.Name);
+            }
+            return clause;
+        }
 
         public bool HasAutoIncPK { get; private set; }
 
@@ -2223,10 +2342,12 @@ namespace Community.SQLite
             else if (clrType == typeof(DateTime))
             {
                 return storeDateTimeAsTicks ? "bigint" : "datetime";
+#if !DOT42
             }
             else if (clrType == typeof(DateTimeOffset))
             {
                 return "bigint";
+#endif
 #if !USE_NEW_REFLECTION_API
             }
             else if (clrType.IsEnum)
@@ -2318,6 +2439,7 @@ namespace Community.SQLite
 #endif
         }
     }
+
 #if !DOT42
     public partial class SQLiteCommand : ISQLiteCommand
     {
@@ -3856,6 +3978,6 @@ namespace Community.SQLite
             Blob = 4,
             Null = 5
         }
-    }
 #endif // DOT42
+    }
 }
