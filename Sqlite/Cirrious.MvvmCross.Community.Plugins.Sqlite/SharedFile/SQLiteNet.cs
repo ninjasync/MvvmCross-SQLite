@@ -806,7 +806,7 @@ namespace Community.SQLite
         /// <returns>
         /// An enumerable with one result for each row returned by the query.
         /// </returns>
-        public List<T> Query<T>(string query, params object[] args) where T : new()
+        public List<T> Query<T>(string query, params object[] args)
         {
             var cmd = CreateCommand(query, args);
             return cmd.ExecuteQuery<T>();
@@ -2525,12 +2525,18 @@ namespace Community.SQLite
 
         public IEnumerable<T> ExecuteDeferredQuery<T>()
         {
+            if(IsRowType(typeof(T)))
+                return ExecuteDeferredQueryForPrimitive<T>();
+
             return ExecuteDeferredQuery<T>(_conn.GetMapping(typeof(T)));
         }
 
         public List<T> ExecuteQuery<T>()
         {
-            return ExecuteDeferredQuery<T>(_conn.GetMapping(typeof(T))).ToList();
+            if (IsRowType(typeof(T)))
+                return ExecuteDeferredQueryForPrimitive<T>().ToList();
+
+            return ExecuteDeferredQuery<T>().ToList();
         }
 
         public List<T> ExecuteQuery<T>(ITableMapping map)
@@ -2586,6 +2592,30 @@ namespace Community.SQLite
                     }
                     OnInstanceCreated(obj);
                     yield return (T)obj;
+                }
+            }
+            finally
+            {
+                SQLite3.Finalize(stmt);
+            }
+        }
+
+        private IEnumerable<T> ExecuteDeferredQueryForPrimitive<T>()
+        {
+            if (_conn.Trace)
+            {
+                Debug.WriteLine("Executing Query: " + this);
+            }
+
+            var stmt = Prepare();
+            var type = typeof(T);
+            try
+            {
+                while (SQLite3.Step(stmt) == SQLite3.Result.Row)
+                {
+                    var colType = SQLite3.ColumnType(stmt, 0);
+                    // TODO: this should be optimized to use a delegate
+                    yield return (T) ReadCol(stmt, 0, colType, type);
                 }
             }
             finally
@@ -2869,6 +2899,13 @@ namespace Community.SQLite
                     throw new NotSupportedException("Don't know how to read " + clrType);
                 }
             }
+        }
+
+        private bool IsRowType(Type t)
+        {
+            return t.IsPrimitive || t.IsEnum
+                || t == typeof(DateTime) || t == typeof(string) || t == typeof(TimeSpan)
+                || t == typeof(Guid) || t == typeof(byte[]);
         }
     }
 

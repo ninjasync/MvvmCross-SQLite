@@ -527,7 +527,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <returns>
         /// An enumerable with one result for each row returned by the query.
         /// </returns>
-        List<T> Query<T>(string query, params object[] args) where T : new();
+        List<T> Query<T>(string query, params object[] args);
 
         /// <summary>
         /// Creates a SQLiteCommand given the command text (SQL) with arguments. Place a '?'
