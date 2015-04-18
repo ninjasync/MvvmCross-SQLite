@@ -4,6 +4,7 @@
 // Contributions and inspirations noted in readme.md and license.txt
 // 
 // Project Lead - Stuart Lodge, @slodge, me@slodge.com
+#pragma warning disable 1591
 
 #if !DOT42
 #define FEATURE_EXPRESSIONS
@@ -466,7 +467,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
 #if FEATURE_EXPRESSIONS
         /// <summary>
         /// Creates an index for the specified object property.
-        /// e.g. CreateIndex<Client>(c => c.Name);
+        /// e.g. CreateIndex&lt;Client&gt;(c => c.Name);
         /// </summary>
         /// <typeparam name="T">Type to reflect to a database table.</typeparam>
         /// <param name="property">Property to index</param>
@@ -482,7 +483,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <param name="cmdText">
         /// The fully escaped SQL.
         /// </param>
-        /// <param name="args">
+        /// <param name="ps">
         /// Arguments to substitute for the occurences of '?' in the command text.
         /// </param>
         /// <returns>
@@ -737,12 +738,12 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         void Commit();
 
         /// <summary>
-        /// Executes <param name="action"> within a (possibly nested) transaction by wrapping it in a SAVEPOINT. If an
+        /// Executes <param name="action"/> within a (possibly nested) transaction by wrapping it in a SAVEPOINT. If an
         /// exception occurs the whole transaction is rolled back, not just the current savepoint. The exception
         /// is rethrown.
         /// </summary>
         /// <param name="action">
-        /// The <see cref="Action"/> to perform within a transaction. <param name="action"> can contain any number
+        /// The <see cref="Action"/> to perform within a transaction. <param name="action"/> can contain any number
         /// of operations on the connection but should never call <see cref="BeginTransaction"/> or
         /// <see cref="Commit"/>.
         /// </param>
@@ -831,6 +832,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows added to the table.
         /// </returns>
         int Insert(object obj, Type objType);
+        int Insert(string overwriteTableName, object obj, Type objType);
 
         /// <summary>
         /// Inserts the given object and retrieves its
@@ -883,6 +885,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows added to the table.
         /// </returns>
         int Insert(object obj, string extra, Type objType);
+        int Insert(string overwriteTableName, object obj, string extra, Type objType);
 
         /// <summary>
         /// Updates all of the columns of a table using the specified object
@@ -930,6 +933,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows updated.
         /// </returns>
         int Update(object obj, Type objType);
+        int Update(string overwriteTableName, object obj, Type objType, ICollection<string> properties);
 
         /// <summary>
         /// Updates all specified objects.

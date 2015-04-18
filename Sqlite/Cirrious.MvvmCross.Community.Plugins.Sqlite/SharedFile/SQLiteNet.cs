@@ -1453,7 +1453,7 @@ namespace Community.SQLite
 
         public int InsertOrReplace(string overwriteTableName, object obj)
         {
-            throw new NotImplementedException();
+            return Insert(overwriteTableName, obj, "OR REPLACE", obj.GetType());
         }
 
         /// <summary>
@@ -1472,6 +1472,11 @@ namespace Community.SQLite
         public int Insert(object obj, Type objType)
         {
             return Insert(obj, "", objType);
+        }
+
+        public int Insert(string overwriteTableName, object obj, Type objType)
+        {
+            return Insert(overwriteTableName, obj, "", objType);
         }
 
         /// <summary>
@@ -1703,6 +1708,11 @@ namespace Community.SQLite
 
         public int Update(string overwriteTableName, object obj, ICollection<string> properties)
         {
+            return Update(overwriteTableName, obj, obj.GetType(), properties);
+        }
+
+        public int Update(string overwriteTableName, object obj, Type objType, ICollection<string> properties)
+        {
             if (obj == null)
             {
                 return 0;
@@ -1710,10 +1720,10 @@ namespace Community.SQLite
 
             if (properties == null)
             {
-                return Update(overwriteTableName, obj, obj.GetType());
+                return Update(overwriteTableName, obj, objType);
             }
 
-            var map = GetMapping(obj.GetType());
+            var map = GetMapping(objType);
             var tableName = overwriteTableName ?? map.TableName;
 
             int rowsAffected = 0;
@@ -1886,7 +1896,7 @@ namespace Community.SQLite
         /// </typeparam>
         public int Delete<T>(object primaryKey)
         {
-            return Delete(null, primaryKey);
+            return Delete<T>(null, primaryKey);
         }
 
         public int Delete<T>(string overwriteTableName, object primaryKey)
