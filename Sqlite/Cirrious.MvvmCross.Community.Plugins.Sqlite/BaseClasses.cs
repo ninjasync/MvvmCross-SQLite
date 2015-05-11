@@ -15,7 +15,22 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+
 using SQLiteOpenFlags = System.Int16;
+
+#if DOT42
+using Dot42;
+using Community.SQLite;
+#else
+    namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
+    {
+        // Define a dummy attribute.
+        [AttributeUsage(AttributeTargets.Method, Inherited = true, AllowMultiple = false)]
+        public class SerializationMethodAttribute : Attribute
+        {
+        }
+    }
+#endif
 
 
 namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
@@ -304,6 +319,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
             where TResult : new()
             where TInner : new();
 
+        [SerializationMethod]
         ITableQuery<TResult> Select<TResult>(Expression<Func<T, TResult>> selector) where TResult : new();
 
         int Count();
@@ -345,7 +361,10 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         T ElementAt(int index);
         INxTableQuery<T> Deferred();
         INxTableQuery<T> OrderBy(string orderBy);
+        
+        [SerializationMethod]
         INxTableQuery<TResult> Select<TResult>(string selector) where TResult : new();
+        
         int Count();
         T First();
         T FirstOrDefault();
@@ -415,6 +434,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The mapping represents the schema of the columns of the database and contains 
         /// methods to set and get properties of objects.
         /// </returns>
+        [SerializationMethod]
         ITableMapping GetMapping<T>();
 
         /// <summary>
@@ -431,7 +451,9 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <returns>
         /// The number of entries added to the database schema.
         /// </returns>
+        [SerializationMethod]
         int CreateTable<T>(CreateFlags createFlags = CreateFlags.None);
+        [SerializationMethod]
         int CreateTable<T>(string overwriteTableName, CreateFlags createFlags = CreateFlags.None);
 
         /// <summary>
@@ -472,6 +494,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <typeparam name="T">Type to reflect to a database table.</typeparam>
         /// <param name="property">Property to index</param>
         /// <param name="unique">Whether the index should be unique</param>
+        [SerializationMethod]
         void CreateIndex<T>(Expression<Func<T, object>> property, bool unique = false);
 #endif
         List<ColumnInfo> GetTableInfo(string tableName);
@@ -509,7 +532,6 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The number of rows modified in the database as a result of this execution.
         /// </returns>
         int Execute(string query, params object[] args);
-
         T ExecuteScalar<T>(string query, params object[] args);
 
         /// <summary>
@@ -527,6 +549,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <returns>
         /// An enumerable with one result for each row returned by the query.
         /// </returns>
+        [SerializationMethod]
         List<T> Query<T>(string query, params object[] args);
 
         /// <summary>
@@ -546,6 +569,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The enumerator will call sqlite3_step on each call to MoveNext, so the database
         /// connection must remain open for the lifetime of the enumerator.
         /// </returns>
+        [SerializationMethod]
         IEnumerable<T> DeferredQuery<T>(string query, params object[] args) where T : new();
 
         /// <summary>
@@ -601,7 +625,9 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// A queryable object that is able to translate Where, OrderBy, and Take
         /// queries into native SQL.
         /// </returns>
+        [SerializationMethod]
         ITableQuery<T> Table<T>() where T : new();
+        [SerializationMethod]
         ITableQuery<T> Table<T>(string overwriteTableName) where T : new();
 #endif
 #if FEATURE_NXTABLEQUERY
@@ -613,7 +639,9 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// A queryable object that is able to translate Where, OrderBy, and Take
         /// queries into native SQL.
         /// </returns>
+        [SerializationMethod]
         INxTableQuery<T> NxTable<T>() where T : new();
+        [SerializationMethod]
         INxTableQuery<T> NxTable<T>(string overwriteTableName) where T : new();
 #endif
         /// <summary>
@@ -628,7 +656,9 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The object with the given primary key. Throws a not found exception
         /// if the object is not found.
         /// </returns>
+        [SerializationMethod]
         T Get<T>(object pk) where T : new();
+        [SerializationMethod]
         T Get<T>(string overwriteTableName, object pk) where T : new();
 #if FEATURE_EXPRESSIONS
         /// <summary>
@@ -642,6 +672,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The object that matches the given predicate. Throws a not found exception
         /// if the object is not found.
         /// </returns>
+        [SerializationMethod]
         T Get<T>(Expression<Func<T, bool>> predicate) where T : new();
 #endif
         /// <summary>
@@ -656,7 +687,9 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The object with the given primary key or null
         /// if the object is not found.
         /// </returns>
+        [SerializationMethod]
         T Find<T>(object pk) where T : new();
+        [SerializationMethod]
         T Find<T>(string overwriteTableName, object pk) where T : new();
 
         /// <summary>
@@ -970,7 +1003,9 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <typeparam name='T'>
         /// The type of object.
         /// </typeparam>
+        [SerializationMethod]
         int Delete<T>(object primaryKey);
+        [SerializationMethod]
         int Delete<T>(string overwriteTableName, object primaryKey);
 
         /// <summary>
@@ -984,6 +1019,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <typeparam name='T'>
         /// The type of objects to delete.
         /// </typeparam>
+        [SerializationMethod]
         int DeleteAll<T>();
 
         void Close();

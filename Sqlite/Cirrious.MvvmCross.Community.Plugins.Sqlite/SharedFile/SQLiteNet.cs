@@ -54,7 +54,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using Cirrious.MvvmCross.Community.Plugins.Sqlite;
-
+using IgnoreAttribute = Cirrious.MvvmCross.Community.Plugins.Sqlite.IgnoreAttribute;
 #if USE_CSHARP_SQLITE
 using Sqlite3 = Community.CsharpSqlite.Sqlite3;
 using Sqlite3DatabaseHandle = Community.CsharpSqlite.Sqlite3.sqlite3;
@@ -68,6 +68,7 @@ using Sqlite3DatabaseHandle = SQLitePCL.sqlite3;
 using Sqlite3Statement = SQLitePCL.sqlite3_stmt;
 using Sqlite3 = SQLitePCL.raw;
 #elif DOT42
+using Dot42;
 using Android.Database;
 using Android.Database.Sqlite;
 using Java.Util.Concurrent.Atomic;
@@ -467,11 +468,13 @@ namespace Community.SQLite
         /// <returns>
         /// The number of entries added to the database schema.
         /// </returns>
+        [SerializationMethod]
         public int CreateTable<T>(CreateFlags createFlags = CreateFlags.None)
         {
             return CreateTable(typeof(T), createFlags);
         }
-
+        
+        [SerializationMethod]
         public int CreateTable<T>(string overwriteTableName, CreateFlags createFlags = CreateFlags.None)
         {
             return CreateTable(typeof (T), overwriteTableName, createFlags);
@@ -627,6 +630,7 @@ namespace Community.SQLite
         /// <typeparam name="T">Type to reflect to a database table.</typeparam>
         /// <param name="property">Property to index</param>
         /// <param name="unique">Whether the index should be unique</param>
+        [SerializationMethod]
         public void CreateIndex<T>(Expression<Func<T, object>> property, bool unique = false)
         {
             MemberExpression mx;
@@ -806,6 +810,7 @@ namespace Community.SQLite
         /// <returns>
         /// An enumerable with one result for each row returned by the query.
         /// </returns>
+        [SerializationMethod]
         public List<T> Query<T>(string query, params object[] args)
         {
             var cmd = CreateCommand(query, args);
@@ -829,6 +834,7 @@ namespace Community.SQLite
         /// The enumerator will call sqlite3_step on each call to MoveNext, so the database
         /// connection must remain open for the lifetime of the enumerator.
         /// </returns>
+        [SerializationMethod]
         public IEnumerable<T> DeferredQuery<T>(string query, params object[] args) where T : new()
         {
             var cmd = CreateCommand(query, args);
@@ -896,11 +902,13 @@ namespace Community.SQLite
         /// A queryable object that is able to translate Where, OrderBy, and Take
         /// queries into native SQL.
         /// </returns>
+        [SerializationMethod]
         public ITableQuery<T> Table<T>() where T : new()
         {
             return new TableQuery<T>(this);
         }
-
+        
+        [SerializationMethod]
         public ITableQuery<T> Table<T>(string overwriteTableName) where T : new()
         {
             return new TableQuery<T>(this, overwriteTableName);
@@ -915,11 +923,13 @@ namespace Community.SQLite
         /// A queryable object that is able to translate Where, OrderBy, and Take
         /// queries into native SQL.
         /// </returns>
+        [SerializationMethod]
         public INxTableQuery<T> NxTable<T>() where T : new()
         {
             return new NxTableQuery<T>(this);
         }
 
+        [SerializationMethod]
         public INxTableQuery<T> NxTable<T>(string overwriteTableName) where T : new()
         {
             return new NxTableQuery<T>(this, overwriteTableName);
@@ -937,12 +947,14 @@ namespace Community.SQLite
         /// The object with the given primary key. Throws a not found exception
         /// if the object is not found.
         /// </returns>
+        [SerializationMethod]
         public T Get<T>(object pk) where T : new()
         {
             var map = GetMapping(typeof(T));
             return Query<T>(map.GetByPrimaryKeySql, pk).First();
         }
 
+        [SerializationMethod]
         public T Get<T>(string overwriteTableName, object pk) where T : new()
         {
             var map = GetMapping(typeof(T));
@@ -961,6 +973,7 @@ namespace Community.SQLite
         /// The object that matches the given predicate. Throws a not found exception
         /// if the object is not found.
         /// </returns>
+        [SerializationMethod]
         public T Get<T>(Expression<Func<T, bool>> predicate) where T : new()
         {
             return Table<T>().Where(predicate).First();
@@ -978,12 +991,14 @@ namespace Community.SQLite
         /// The object with the given primary key or null
         /// if the object is not found.
         /// </returns>
+        [SerializationMethod]
         public T Find<T>(object pk) where T : new()
         {
             var map = GetMapping(typeof(T));
             return Query<T>(map.GetByPrimaryKeySql, pk).FirstOrDefault();
         }
-
+        
+        [SerializationMethod]
         public T Find<T>(string overwriteTableName, object pk) where T : new()
         {
             var map = GetMapping(typeof(T));
@@ -1027,6 +1042,7 @@ namespace Community.SQLite
         /// The object that matches the given predicate or null
         /// if the object is not found.
         /// </returns>
+        [SerializationMethod]
         public T Find<T>(Expression<Func<T, bool>> predicate) where T : new()
         {
             return Table<T>().Where(predicate).FirstOrDefault();
@@ -1046,6 +1062,7 @@ namespace Community.SQLite
         /// The object that matches the given predicate or null
         /// if the object is not found.
         /// </returns>
+        [SerializationMethod]
         public T FindWithQuery<T>(string query, params object[] args) where T : new()
         {
             return Query<T>(query, args).FirstOrDefault();
@@ -1078,9 +1095,10 @@ namespace Community.SQLite
 #if !DOT42
             if (Interlocked.CompareExchange(ref _transactionDepth, 1, 0) == 0)
 #else
-            if (_transactionDepth.CompareAndSet(1, 0))
+            if (_transactionDepth.CompareAndSet(0, 1))
 #endif
             {
+#if !DOT42
                 try
                 {
                     Execute("begin transaction");
@@ -1108,15 +1126,27 @@ namespace Community.SQLite
                     {
                         // Call decrement and not VolatileWrite in case we've already 
                         //    created a transaction point in SaveTransactionPoint since the catch.
-#if !DOT42
+
                         Interlocked.Decrement(ref _transactionDepth);
-#else
-                        _transactionDepth.DecrementAndGet();
-#endif
                     }
 
                     throw;
                 }
+#else
+                try
+                {
+                    Handle.BeginTransaction();
+                }
+                catch (SQLException ex)
+                {
+                    _transactionDepth.DecrementAndGet();
+                    SQLiteException.New(ex);
+                }
+                catch
+                {
+                    _transactionDepth.DecrementAndGet();
+                }
+#endif
             }
             else
             {
@@ -1134,13 +1164,10 @@ namespace Community.SQLite
         /// Call <see cref="Commit"/> to end the transaction, committing all changes.
         /// </summary>
         /// <returns>A string naming the savepoint.</returns>
+#if !DOT42
         public string SaveTransactionPoint()
         {
-#if !DOT42
             int depth = Interlocked.Increment(ref _transactionDepth) - 1;
-#else
-            int depth = _transactionDepth.GetAndIncrement();
-#endif
             string retVal = "S" + _rand.Next(short.MaxValue) + "D" + depth;
 
             try
@@ -1168,11 +1195,7 @@ namespace Community.SQLite
                 }
                 else
                 {
-#if !DOT42
                     Interlocked.Decrement(ref _transactionDepth);
-#else
-                    _transactionDepth.DecrementAndGet();
-#endif
                 }
 
                 throw;
@@ -1180,7 +1203,36 @@ namespace Community.SQLite
 
             return retVal;
         }
+#else
 
+        public string SaveTransactionPoint()
+        {
+            // NOTE: I don't think there is sense in making
+            //       transaction handling multithreading capable.
+            //       Who is responsible for a commit, anyway?
+
+            int depth = _transactionDepth.Get();
+
+            if (depth == 0)
+                BeginTransaction();
+            else
+                _transactionDepth.IncrementAndGet();
+
+            string retVal = "S" + _rand.Next(short.MaxValue) + "D" + depth;
+
+            try
+            {
+                Execute("savepoint " + retVal);
+            }
+            catch
+            {
+                _transactionDepth.DecrementAndGet();
+                if(depth == 0)
+                    RollbackTo(null, true);
+            }
+            return retVal;
+        }
+#endif
         /// <summary>
         /// Rolls back the transaction that was begun by <see cref="BeginTransaction"/> or <see cref="SaveTransactionPoint"/>.
         /// </summary>
@@ -1212,16 +1264,24 @@ namespace Community.SQLite
                 {
 #if !DOT42
                     if (Interlocked.Exchange(ref _transactionDepth, 0) > 0)
-#else
-                    if (_transactionDepth.GetAndSet(0) > 0)
-#endif
                     {
                         Execute("rollback");
                     }
+#else
+                    if (_transactionDepth.GetAndSet(0) > 0)
+                    {
+                        Handle.EndTransaction();
+                    }
+#endif
                 }
                 else
                 {
+#if !DOT42
                     DoSavePointExecute(savepoint, "rollback to ");
+#else
+                    // https://code.google.com/p/android/issues/detail?id=38706
+                    DoSavePointExecute(savepoint, ";rollback to ");
+#endif
                 }
             }
             catch (SQLiteException)
@@ -1245,7 +1305,7 @@ namespace Community.SQLite
         {
             DoSavePointExecute(savepoint, "release ");
         }
-
+#if !DOT42
         void DoSavePointExecute(string savepoint, string cmd)
         {
             // Validate the savepoint
@@ -1255,7 +1315,6 @@ namespace Community.SQLite
                 int depth;
                 if (Int32.TryParse(savepoint.Substring(firstLen + 1), out depth))
                 {
-#if !DOT42
                     // TODO: Mild race here, but inescapable without locking almost everywhere.
                     if (0 <= depth && depth < _transactionDepth)
                     {
@@ -1264,20 +1323,46 @@ namespace Community.SQLite
 #else
                         Volatile.Write(ref _transactionDepth, depth);
 #endif
-#else
-                    if (0 <= depth && depth < _transactionDepth.Get())
-                    {
-                        _transactionDepth.Set(depth);
-#endif
                         Execute(cmd + savepoint);
                         return;
                     }
+
                 }
             }
 
             throw new ArgumentException("savePoint is not valid, and should be the result of a call to SaveTransactionPoint.", "savePoint");
         }
+#else
+        void DoSavePointExecute(string savepoint, string cmd)
+        {
+            // Validate the savepoint
+            int firstLen = savepoint.IndexOf('D');
+            if (firstLen >= 2 && savepoint.Length > firstLen + 1)
+            {
+                int depth;
+                if (Int32.TryParse(savepoint.Substring(firstLen + 1), out depth))
+                {
+                    if (0 <= depth && depth < _transactionDepth.Get())
+                    {
+                        if (depth == 0)
+                        {
+                            Execute(cmd + savepoint);
+                            Commit();
+                        }
+                        else
+                        {
+                            _transactionDepth.Set(depth);
+                            Execute(cmd + savepoint);
+                        }
+                        return;
+                    }
 
+                }
+            }
+
+            throw new ArgumentException("savePoint is not valid, and should be the result of a call to SaveTransactionPoint.", "savePoint");
+        }
+#endif
         /// <summary>
         /// Commits the transaction that was begun by <see cref="BeginTransaction"/>.
         /// </summary>
@@ -1285,12 +1370,17 @@ namespace Community.SQLite
         {
 #if !DOT42
             if (Interlocked.Exchange(ref _transactionDepth, 0) != 0)
-#else
-            if (_transactionDepth.GetAndSet(0) != 0)
-#endif
             {
                 Execute("commit");
             }
+#else
+            if (_transactionDepth.GetAndSet(0) != 0)
+            {
+                Handle.SetTransactionSuccessful();
+                Handle.EndTransaction();
+            }
+#endif
+      
             // Do nothing on a commit with no open transaction
         }
 
@@ -1894,11 +1984,13 @@ namespace Community.SQLite
         /// <typeparam name='T'>
         /// The type of object.
         /// </typeparam>
+        [SerializationMethod]
         public int Delete<T>(object primaryKey)
         {
             return Delete<T>(null, primaryKey);
         }
-
+        
+        [SerializationMethod]
         public int Delete<T>(string overwriteTableName, object primaryKey)
         {
             var map = GetMapping(typeof(T));
@@ -1942,10 +2034,12 @@ namespace Community.SQLite
             return count;
         }
 
+#if !DOT42
         ~SQLiteConnection()
         {
             Dispose(false);
         }
+#endif
 
         public void Dispose()
         {
