@@ -468,14 +468,12 @@ namespace Community.SQLite
         /// <returns>
         /// The number of entries added to the database schema.
         /// </returns>
-        [SerializationMethod]
-        public int CreateTable<T>(CreateFlags createFlags = CreateFlags.None)
+        public int CreateTable<[SerializedParameter] T>(CreateFlags createFlags = CreateFlags.None)
         {
             return CreateTable(typeof(T), createFlags);
         }
         
-        [SerializationMethod]
-        public int CreateTable<T>(string overwriteTableName, CreateFlags createFlags = CreateFlags.None)
+        public int CreateTable<[SerializedParameter] T>(string overwriteTableName, CreateFlags createFlags = CreateFlags.None)
         {
             return CreateTable(typeof (T), overwriteTableName, createFlags);
         }
@@ -810,8 +808,7 @@ namespace Community.SQLite
         /// <returns>
         /// An enumerable with one result for each row returned by the query.
         /// </returns>
-        [SerializationMethod]
-        public List<T> Query<T>(string query, params object[] args)
+        public List<T> Query<[SerializedParameter] T>(string query, params object[] args)
         {
             var cmd = CreateCommand(query, args);
             return cmd.ExecuteQuery<T>();
@@ -834,8 +831,7 @@ namespace Community.SQLite
         /// The enumerator will call sqlite3_step on each call to MoveNext, so the database
         /// connection must remain open for the lifetime of the enumerator.
         /// </returns>
-        [SerializationMethod]
-        public IEnumerable<T> DeferredQuery<T>(string query, params object[] args) where T : new()
+        public IEnumerable<T> DeferredQuery<[SerializedParameter] T>(string query, params object[] args) where T : new()
         {
             var cmd = CreateCommand(query, args);
             return cmd.ExecuteDeferredQuery<T>();
@@ -923,14 +919,12 @@ namespace Community.SQLite
         /// A queryable object that is able to translate Where, OrderBy, and Take
         /// queries into native SQL.
         /// </returns>
-        [SerializationMethod]
-        public INxTableQuery<T> NxTable<T>() where T : new()
+        public INxTableQuery<T> NxTable<[SerializedParameter] T>() where T : new()
         {
             return new NxTableQuery<T>(this);
         }
 
-        [SerializationMethod]
-        public INxTableQuery<T> NxTable<T>(string overwriteTableName) where T : new()
+        public INxTableQuery<T> NxTable<[SerializedParameter] T>(string overwriteTableName) where T : new()
         {
             return new NxTableQuery<T>(this, overwriteTableName);
         }
@@ -947,15 +941,13 @@ namespace Community.SQLite
         /// The object with the given primary key. Throws a not found exception
         /// if the object is not found.
         /// </returns>
-        [SerializationMethod]
-        public T Get<T>(object pk) where T : new()
+        public T Get<[SerializedParameter] T>(object pk) where T : new()
         {
             var map = GetMapping(typeof(T));
             return Query<T>(map.GetByPrimaryKeySql, pk).First();
         }
 
-        [SerializationMethod]
-        public T Get<T>(string overwriteTableName, object pk) where T : new()
+        public T Get<[SerializedParameter] T>(string overwriteTableName, object pk) where T : new()
         {
             var map = GetMapping(typeof(T));
             return Query<T>(string.Format(map.GetByPrimaryKeySqlWithVariableTable, overwriteTableName??map.TableName), pk).First();
@@ -991,15 +983,13 @@ namespace Community.SQLite
         /// The object with the given primary key or null
         /// if the object is not found.
         /// </returns>
-        [SerializationMethod]
-        public T Find<T>(object pk) where T : new()
+        public T Find<[SerializedParameter] T>(object pk) where T : new()
         {
             var map = GetMapping(typeof(T));
             return Query<T>(map.GetByPrimaryKeySql, pk).FirstOrDefault();
         }
         
-        [SerializationMethod]
-        public T Find<T>(string overwriteTableName, object pk) where T : new()
+        public T Find<[SerializedParameter] T>(string overwriteTableName, object pk) where T : new()
         {
             var map = GetMapping(typeof(T));
             return Query<T>(string.Format(map.GetByPrimaryKeySqlWithVariableTable, overwriteTableName??map.TableName), pk).FirstOrDefault();
@@ -1062,8 +1052,7 @@ namespace Community.SQLite
         /// The object that matches the given predicate or null
         /// if the object is not found.
         /// </returns>
-        [SerializationMethod]
-        public T FindWithQuery<T>(string query, params object[] args) where T : new()
+        public T FindWithQuery<[SerializedParameter] T>(string query, params object[] args) where T : new()
         {
             return Query<T>(query, args).FirstOrDefault();
         }
@@ -1984,14 +1973,12 @@ namespace Community.SQLite
         /// <typeparam name='T'>
         /// The type of object.
         /// </typeparam>
-        [SerializationMethod]
-        public int Delete<T>(object primaryKey)
+        public int Delete<[SerializedParameter] T>(object primaryKey)
         {
             return Delete<T>(null, primaryKey);
         }
-        
-        [SerializationMethod]
-        public int Delete<T>(string overwriteTableName, object primaryKey)
+
+        public int Delete<[SerializedParameter] T>(string overwriteTableName, object primaryKey)
         {
             var map = GetMapping(typeof(T));
             var tableName = overwriteTableName ?? map.TableName;

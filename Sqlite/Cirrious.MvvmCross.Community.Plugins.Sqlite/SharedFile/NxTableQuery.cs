@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -13,6 +14,7 @@ namespace Community.SQLite
     /// <typeparam name="T"></typeparam>
     public class NxTableQuery<T> : INxTableQuery<T> where T : new()
     {
+        [SuppressMessage("dot42", "StaticFieldInGenericType")]
         private static readonly object[] EmptyArgs = new object[0];
 
         public SQLiteConnection Connection { get; private set; }

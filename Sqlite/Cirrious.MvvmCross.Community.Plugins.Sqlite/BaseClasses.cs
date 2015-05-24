@@ -362,8 +362,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         INxTableQuery<T> Deferred();
         INxTableQuery<T> OrderBy(string orderBy);
         
-        [SerializationMethod]
-        INxTableQuery<TResult> Select<TResult>(string selector) where TResult : new();
+        INxTableQuery<TResult> Select<[SerializedParameter] TResult>(string selector) where TResult : new();
         
         int Count();
         T First();
@@ -434,8 +433,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The mapping represents the schema of the columns of the database and contains 
         /// methods to set and get properties of objects.
         /// </returns>
-        [SerializationMethod]
-        ITableMapping GetMapping<T>();
+        ITableMapping GetMapping<[SerializedParameter] T>();
 
         /// <summary>
         /// Executes a "drop table" on the database.  This is non-recoverable.
@@ -451,10 +449,8 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <returns>
         /// The number of entries added to the database schema.
         /// </returns>
-        [SerializationMethod]
-        int CreateTable<T>(CreateFlags createFlags = CreateFlags.None);
-        [SerializationMethod]
-        int CreateTable<T>(string overwriteTableName, CreateFlags createFlags = CreateFlags.None);
+        int CreateTable<[SerializedParameter] T>(CreateFlags createFlags = CreateFlags.None);
+        int CreateTable<[SerializedParameter] T>(string overwriteTableName, CreateFlags createFlags = CreateFlags.None);
 
         /// <summary>
         /// Executes a "create table if not exists" on the database. It also
@@ -549,8 +545,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <returns>
         /// An enumerable with one result for each row returned by the query.
         /// </returns>
-        [SerializationMethod]
-        List<T> Query<T>(string query, params object[] args);
+        List<T> Query<[SerializedParameter] T>(string query, params object[] args);
 
         /// <summary>
         /// Creates a SQLiteCommand given the command text (SQL) with arguments. Place a '?'
@@ -569,8 +564,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The enumerator will call sqlite3_step on each call to MoveNext, so the database
         /// connection must remain open for the lifetime of the enumerator.
         /// </returns>
-        [SerializationMethod]
-        IEnumerable<T> DeferredQuery<T>(string query, params object[] args) where T : new();
+        IEnumerable<T> DeferredQuery<[SerializedParameter] T>(string query, params object[] args) where T : new();
 
         /// <summary>
         /// Creates a SQLiteCommand given the command text (SQL) with arguments. Place a '?'
@@ -639,10 +633,8 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// A queryable object that is able to translate Where, OrderBy, and Take
         /// queries into native SQL.
         /// </returns>
-        [SerializationMethod]
-        INxTableQuery<T> NxTable<T>() where T : new();
-        [SerializationMethod]
-        INxTableQuery<T> NxTable<T>(string overwriteTableName) where T : new();
+        INxTableQuery<T> NxTable<[SerializedParameter] T>() where T : new();
+        INxTableQuery<T> NxTable<[SerializedParameter] T>(string overwriteTableName) where T : new();
 #endif
         /// <summary>
         /// Attempts to retrieve an object with the given primary key from the table
@@ -656,10 +648,8 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The object with the given primary key. Throws a not found exception
         /// if the object is not found.
         /// </returns>
-        [SerializationMethod]
-        T Get<T>(object pk) where T : new();
-        [SerializationMethod]
-        T Get<T>(string overwriteTableName, object pk) where T : new();
+        T Get<[SerializedParameter] T>(object pk) where T : new();
+        T Get<[SerializedParameter] T>(string overwriteTableName, object pk) where T : new();
 #if FEATURE_EXPRESSIONS
         /// <summary>
         /// Attempts to retrieve the first object that matches the predicate from the table
@@ -687,10 +677,8 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The object with the given primary key or null
         /// if the object is not found.
         /// </returns>
-        [SerializationMethod]
-        T Find<T>(object pk) where T : new();
-        [SerializationMethod]
-        T Find<T>(string overwriteTableName, object pk) where T : new();
+        T Find<[SerializedParameter] T>(object pk) where T : new();
+        T Find<[SerializedParameter] T>(string overwriteTableName, object pk) where T : new();
 
         /// <summary>
         /// Attempts to retrieve an object with the given primary key from the table
@@ -1003,10 +991,8 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <typeparam name='T'>
         /// The type of object.
         /// </typeparam>
-        [SerializationMethod]
-        int Delete<T>(object primaryKey);
-        [SerializationMethod]
-        int Delete<T>(string overwriteTableName, object primaryKey);
+        int Delete<[SerializedParameter] T>(object primaryKey);
+        int Delete<[SerializedParameter] T>(string overwriteTableName, object primaryKey);
 
         /// <summary>
         /// Deletes all the objects from the specified table.
@@ -1019,8 +1005,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// <typeparam name='T'>
         /// The type of objects to delete.
         /// </typeparam>
-        [SerializationMethod]
-        int DeleteAll<T>();
+        int DeleteAll<[SerializedParameter] T>();
 
         void Close();
     }

@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.50727</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{9CE1041C-A7BC-4D63-8A1C-84CDC05CD690}</ProjectGuid>
+    <ProjectTypeGuids>{337B7DB7-2D1E-448D-BEBF-17E887A46E37};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Community.SQLite</RootNamespace>
+    <AssemblyName>Cirrious.MvvmCross.Community.Plugins.Sqlite.Dot42</AssemblyName>
+    <TargetFrameworkIdentifier>Android</TargetFrameworkIdentifier>
+    <TargetFrameworkVersion>v4.0.3</TargetFrameworkVersion>
+    <AndroidVersion>$(TargetFrameworkVersion)</AndroidVersion>
+    <SupportedCultures>
+    </SupportedCultures>
+    <ApkOutputs>false</ApkOutputs>
+    <GenerateAndroidManifest>false</GenerateAndroidManifest>
+    <ApkFilename>.apk</ApkFilename>
+    <PackageName>
+    </PackageName>
+    <Dot42ExtensionsPath Condition=" '$(Dot42ExtensionsPath)' == '' ">$(Registry:HKEY_CURRENT_USER\SOFTWARE\dot42\Android@ExtensionsPath)</Dot42ExtensionsPath>
+    <Dot42ExtensionsPath Condition=" '$(Dot42ExtensionsPath)' == '' ">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\dot42\Android@ExtensionsPath)</Dot42ExtensionsPath>
+    <ApkCertificatePath>
+    </ApkCertificatePath>
+    <ApkCertificateThumbprint>
+    </ApkCertificateThumbprint>
+    <TargetSdkAndroidVersion />
+    <GenerateWcfProxy>false</GenerateWcfProxy>
+    <GenerateSetNextInstructionCode>false</GenerateSetNextInstructionCode>
+    <EnableCompilerCache>false</EnableCompilerCache>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\..\bin\Debug\Mvx\Droid\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;DOT42</DefineConstants>
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\..\bin\Release\Mvx\Dot42\</OutputPath>
+    <DefineConstants>TRACE;DOT42</DefineConstants>
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Dot42" />
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\BaseClasses.cs">
+      <Link>BaseClasses.cs</Link>
+    </Compile>
+    <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\PluginLoader.cs">
+      <Link>PluginLoader.cs</Link>
+    </Compile>
+    <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\SharedFile\NxTableQuery.cs">
+      <Link>NxTableQuery.cs</Link>
+    </Compile>
+    <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\SharedFile\SQLiteNet.cs">
+      <Link>SQLiteNet.cs</Link>
+    </Compile>
+    <Compile Include="DatabaseFactory.cs" />
+    <Compile Include="PreparedSqlLiteInsertCommand.cs" />
+    <Compile Include="SQLiteCommand.cs" />
+    <None Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\SharedFile\SQLiteAsync.cs">
+      <Link>SQLiteAsync.cs</Link>
+    </None>
+    <Compile Include="MvxDot42SQLiteConnectionFactory.cs" />
+    <Compile Include="Plugin.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\MvvmCross\Dot42\MvvmCross.Dot42.csproj">
+      <Project>{9693e85e-16a9-4750-9414-c84bdd5febdd}</Project>
+      <Name>MvvmCross.Dot42</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(Dot42ExtensionsPath)\Dot42.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
