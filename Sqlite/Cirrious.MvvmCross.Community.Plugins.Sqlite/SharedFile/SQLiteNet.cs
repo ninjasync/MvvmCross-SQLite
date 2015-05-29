@@ -2904,10 +2904,17 @@ namespace Community.SQLite
                 }
                 else if (clrType == typeof(double))
                 {
+                    // http://sqlite.1065341.n5.nabble.com/NaN-in-0-0-out-td19086.html
+                    if (type != SQLite3.ColType.Float && type != SQLite3.ColType.Integer)
+                        return double.NaN;
                     return SQLite3.ColumnDouble(stmt, index);
                 }
                 else if (clrType == typeof(float))
                 {
+                    // http://sqlite.1065341.n5.nabble.com/NaN-in-0-0-out-td19086.html
+                    if (type != SQLite3.ColType.Float && type != SQLite3.ColType.Integer)
+                        return float.NaN;
+
                     return (float)SQLite3.ColumnDouble(stmt, index);
                 }
                 else if (clrType == typeof(TimeSpan))

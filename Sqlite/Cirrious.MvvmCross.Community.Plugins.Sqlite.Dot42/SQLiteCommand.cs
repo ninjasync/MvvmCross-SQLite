@@ -134,7 +134,7 @@ namespace Community.SQLite
                             if (cols[i] == null)
                                 continue;
 
-                            var colType = cursor.GetType(i); // API level 11, only used for IsNull check.
+                            var colType = cursor.GetType(i); // API level 11, used for IsNull and NaN check.
                             var val = ReadCol(cursor, i, colType, cols[i].ColumnType);
                             cols[i].SetValue(obj, val);
                         }
@@ -462,10 +462,18 @@ namespace Community.SQLite
                 }
                 else if (clrType == typeof(double))
                 {
+                    // http://sqlite.1065341.n5.nabble.com/NaN-in-0-0-out-td19086.html
+                    if (fieldType != ICursorConstants.FIELD_TYPE_FLOAT && fieldType != ICursorConstants.FIELD_TYPE_INTEGER)
+                        return double.NaN;
+
                     return cursor.GetDouble(index);
                 }
                 else if (clrType == typeof(float))
                 {
+                    // http://sqlite.1065341.n5.nabble.com/NaN-in-0-0-out-td19086.html
+                    if (fieldType != ICursorConstants.FIELD_TYPE_FLOAT && fieldType != ICursorConstants.FIELD_TYPE_INTEGER)
+                        return float.NaN;
+
                     return cursor.GetFloat(index);
                 }
                 else if (clrType == typeof(TimeSpan))
