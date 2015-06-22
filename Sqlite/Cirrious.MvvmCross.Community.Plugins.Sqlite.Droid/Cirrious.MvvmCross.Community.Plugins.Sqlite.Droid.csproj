@@ -86,6 +86,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\SharedFile\IsoDateTimeUtils.cs">
+      <Link>IsoDateTimeUtils.cs</Link>
+    </Compile>
     <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\SharedFile\NxTableQuery.cs">
       <Link>NxTableQuery.cs</Link>
     </Compile>

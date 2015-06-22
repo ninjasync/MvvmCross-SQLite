@@ -25,9 +25,9 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite.Wpf
             return Path.Combine(path1, path2);
         }
 
-        protected override ISQLiteConnection CreateSQLiteConnection(string databasePath, bool storeDateTimeAsTicks)
+        protected override ISQLiteConnection CreateSQLiteConnection(string databasePath, DateTimeFormat dateTimeFormat)
         {
-            return new SQLiteConnection(databasePath, storeDateTimeAsTicks);
+            return new SQLiteConnection(databasePath, dateTimeFormat);
         }
     }
 }

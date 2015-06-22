@@ -6,6 +6,7 @@ using Android.Database;
 using Android.Database.Sqlite;
 using Android.OS;
 using Cirrious.MvvmCross.Community.Plugins.Sqlite;
+using Community.Sqlite;
 using Debug = System.Diagnostics.Debug;
 using Environment = System.Environment;
 
@@ -13,7 +14,7 @@ namespace Community.SQLite
 {
     public partial class SQLiteCommand : ISQLiteCommand, SQLiteDatabase.ICursorFactory
     {
-        private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
+        private const string LegacyDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
         // parameter binding:
         // http://stackoverflow.com/questions/20911760/android-how-to-query-sqlitedatabase-with-non-string-selection-args
@@ -331,7 +332,7 @@ namespace Community.SQLite
                     b.Index = nextIdx++;
                 }
 
-                BindParameter(stmt, b.Index, b.Value, _conn.StoreDateTimeAsTicks);
+                BindParameter(stmt, b.Index, b.Value, _conn.DateTimeFormat);
             }
         }
 
@@ -348,7 +349,7 @@ namespace Community.SQLite
             }
         }
 
-        internal static void BindParameter(SQLiteProgram stmt, int index, object value, bool storeDateTimeAsTicks)
+        internal static void BindParameter(SQLiteProgram stmt, int index, object value, DateTimeFormat dateTimeFormat)
         {
             if (value == null)
             {
@@ -395,13 +396,17 @@ namespace Community.SQLite
                 }
                 else if (type == typeof(DateTime))
                 {
-                    if (storeDateTimeAsTicks)
+                    if (dateTimeFormat == DateTimeFormat.Ticks)
                     {
                         stmt.BindLong(index, ((DateTime)value).Ticks);
                     }
-                    else
+                    else if(dateTimeFormat == DateTimeFormat.String)
                     {
-                        stmt.BindString(index, ((DateTime)value).ToString(DateTimeFormat, CultureInfo.InvariantCulture));
+                        stmt.BindString(index, ((DateTime)value).ToString(LegacyDateTimeFormat, CultureInfo.InvariantCulture));
+                    }
+                    else // IsoString
+                    {
+                        stmt.BindString(index, ((DateTime)value).ToIsoString());
                     }
                     //}
                 //else if (value is DateTimeOffset)
@@ -482,14 +487,19 @@ namespace Community.SQLite
                 }
                 else if (clrType == typeof(DateTime))
                 {
-                    if (_conn.StoreDateTimeAsTicks)
+                    if (_conn.DateTimeFormat == DateTimeFormat.Ticks)
                     {
                         return new DateTime(cursor.GetLong(index));
                     }
-                    else
+                    else 
                     {
+                        // try both string formats.
                         var text = cursor.GetString(index);
-                        return DateTime.ParseExact(text, DateTimeFormat, CultureInfo.InvariantCulture);
+                        object dt;
+                        if (IsoDateTimeUtils.TryParseDateIso(text, DateTimeZoneHandling.Unspecified, out dt))
+                            return dt;
+
+                        return DateTime.ParseExact(text, LegacyDateTimeFormat, CultureInfo.InvariantCulture);
                     }
                 //}
                 //else if (clrType == typeof(DateTimeOffset))

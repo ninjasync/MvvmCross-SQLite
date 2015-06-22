@@ -54,6 +54,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using Cirrious.MvvmCross.Community.Plugins.Sqlite;
+using Community.Sqlite;
 using IgnoreAttribute = Cirrious.MvvmCross.Community.Plugins.Sqlite.IgnoreAttribute;
 #if USE_CSHARP_SQLITE
 using Sqlite3 = Community.CsharpSqlite.Sqlite3;
@@ -242,7 +243,7 @@ namespace Community.SQLite
 
         public bool Trace { get; set; }
 
-        public bool StoreDateTimeAsTicks { get; private set; }
+        public DateTimeFormat  DateTimeFormat { get; private set; }
 
         /// <summary>
         /// Constructs a new SQLiteConnection and opens a SQLite database specified by databasePath.
@@ -250,14 +251,13 @@ namespace Community.SQLite
         /// <param name="databasePath">
         /// Specifies the path to the database file.
         /// </param>
-        /// <param name="storeDateTimeAsTicks">
-        /// Specifies whether to store DateTime properties as ticks (true) or strings (false). You
-        /// absolutely do want to store them as Ticks in all new projects. The default of false is
-        /// only here for backwards compatibility. There is a *significant* speed advantage, with no
-        /// down sides, when setting storeDateTimeAsTicks = true.
+        /// <param name="dateTimeFormat">
+        /// Specifies the way DateTime values are stored in the database. The default of 'String' is
+        /// only here for backwards compatibility. There is a *significant* speed advantage, when 
+        /// setting dateTimeFormat to 'Ticks'.
         /// </param>
-        public SQLiteConnection(string databasePath, bool storeDateTimeAsTicks = false)
-            : this(databasePath, SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create, storeDateTimeAsTicks)
+        public SQLiteConnection(string databasePath, DateTimeFormat dateTimeFormat = DateTimeFormat.String)
+            : this(databasePath, SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create, dateTimeFormat)
         {
         }
 
@@ -267,13 +267,12 @@ namespace Community.SQLite
         /// <param name="databasePath">
         /// Specifies the path to the database file.
         /// </param>
-        /// <param name="storeDateTimeAsTicks">
-        /// Specifies whether to store DateTime properties as ticks (true) or strings (false). You
-        /// absolutely do want to store them as Ticks in all new projects. The default of false is
-        /// only here for backwards compatibility. There is a *significant* speed advantage, with no
-        /// down sides, when setting storeDateTimeAsTicks = true.
+        /// <param name="dateTimeFormat">
+        /// Specifies the way DateTime values are stored in the database. The default of 'String' is
+        /// only here for backwards compatibility. There is a *significant* speed advantage, when 
+        /// setting dateTimeFormat to 'Ticks'.
         /// </param>
-        public SQLiteConnection(string databasePath, SQLiteOpenFlags openFlags, bool storeDateTimeAsTicks = false)
+        public SQLiteConnection(string databasePath, SQLiteOpenFlags openFlags, DateTimeFormat dateTimeFormat = DateTimeFormat.String)
         {
             if (databasePath == null)
                 throw new ArgumentException("Cannot be null, must be specified, or empty.", "databasePath");
@@ -306,7 +305,7 @@ namespace Community.SQLite
 #endif
             _open = true;
 
-            StoreDateTimeAsTicks = storeDateTimeAsTicks;
+            DateTimeFormat = dateTimeFormat;
 
             BusyTimeout = TimeSpan.FromSeconds(0.1);
         }
@@ -512,7 +511,7 @@ namespace Community.SQLite
 		    var pkCols = map.Columns.Where(p => p.IsPK); 
 			int numPkCols = pkCols.Count(); 
  
-			var decls = map.Columns.Select(p => Orm.SqlDecl(p, StoreDateTimeAsTicks, numPkCols == 1)); 
+			var decls = map.Columns.Select(p => Orm.SqlDecl(p, DateTimeFormat, numPkCols == 1)); 
 
             var decl = string.Join(",\n", decls.ToArray());
             query += decl;
@@ -683,7 +682,7 @@ namespace Community.SQLite
 
             foreach (var p in toBeAdded)
             {
-                var addCol = "alter table \"" + trueTableName + "\" add column " + Orm.SqlDecl(p, StoreDateTimeAsTicks);
+                var addCol = "alter table \"" + trueTableName + "\" add column " + Orm.SqlDecl(p, DateTimeFormat);
                 Execute(addCol);
             }
         }
@@ -2107,16 +2106,16 @@ namespace Community.SQLite
     {
         public string ConnectionString { get; private set; }
         public string DatabasePath { get; private set; }
-        public bool StoreDateTimeAsTicks { get; private set; }
+        public DateTimeFormat DateTimeFormat { get; private set; }
 
 #if NETFX_CORE
 		static readonly string MetroStyleDataPath = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
 #endif
 
-        public SQLiteConnectionString(string databasePath, bool storeDateTimeAsTicks)
+        public SQLiteConnectionString(string databasePath, DateTimeFormat dateTimeFormat)
         {
             ConnectionString = databasePath;
-            StoreDateTimeAsTicks = storeDateTimeAsTicks;
+            DateTimeFormat = dateTimeFormat;
 
 #if NETFX_CORE
 			DatabasePath = System.IO.Path.Combine (MetroStyleDataPath, databasePath);
@@ -2404,9 +2403,9 @@ namespace Community.SQLite
         public const string ImplicitPkName = "Id";
         public const string ImplicitIndexSuffix = "Id";
 
-        public static string SqlDecl(TableMapping.Column p, bool storeDateTimeAsTicks, bool trySetAsPrimaryKey = true)
+        public static string SqlDecl(TableMapping.Column p, DateTimeFormat dateTimeFormat, bool trySetAsPrimaryKey = true)
         {
-            string decl = "\"" + p.Name + "\" " + SqlType(p, storeDateTimeAsTicks) + " ";
+            string decl = "\"" + p.Name + "\" " + SqlType(p, dateTimeFormat) + " ";
 
             if (trySetAsPrimaryKey && p.IsPK)
             {
@@ -2428,7 +2427,7 @@ namespace Community.SQLite
             return decl;
         }
 
-        public static string SqlType(TableMapping.Column p, bool storeDateTimeAsTicks)
+        public static string SqlType(TableMapping.Column p, DateTimeFormat dateTimeFormat)
         {
             var clrType = p.ColumnType;
             if (clrType == typeof(Boolean) || clrType == typeof(Byte) || clrType == typeof(UInt16) || clrType == typeof(SByte) || clrType == typeof(Int16) || clrType == typeof(Int32))
@@ -2458,7 +2457,7 @@ namespace Community.SQLite
             }
             else if (clrType == typeof(DateTime))
             {
-                return storeDateTimeAsTicks ? "bigint" : "datetime";
+                return dateTimeFormat == DateTimeFormat.Ticks ? "bigint" : "datetime";
 #if !DOT42
             }
             else if (clrType == typeof(DateTimeOffset))
@@ -2562,6 +2561,8 @@ namespace Community.SQLite
     {
         SQLiteConnection _conn;
         private List<Binding> _bindings;
+
+        private const string LegacyDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
 
         public string CommandText { get; set; }
 
@@ -2793,13 +2794,13 @@ namespace Community.SQLite
                     b.Index = nextIdx++;
                 }
 
-                BindParameter(stmt, b.Index, b.Value, _conn.StoreDateTimeAsTicks);
+                BindParameter(stmt, b.Index, b.Value, _conn.DateTimeFormat);
             }
         }
 
         internal static IntPtr NegativePointer = new IntPtr(-1);
 
-        internal static void BindParameter(Sqlite3Statement stmt, int index, object value, bool storeDateTimeAsTicks)
+        internal static void BindParameter(Sqlite3Statement stmt, int index, object value, DateTimeFormat dateTimeFormat)
         {
             if (value == null)
             {
@@ -2837,13 +2838,17 @@ namespace Community.SQLite
                 }
                 else if (value is DateTime)
                 {
-                    if (storeDateTimeAsTicks)
+                    if (dateTimeFormat == DateTimeFormat.Ticks)
                     {
                         SQLite3.BindInt64(stmt, index, ((DateTime)value).Ticks);
                     }
-                    else
+                    else if (dateTimeFormat == DateTimeFormat.String)
                     {
                         SQLite3.BindText(stmt, index, ((DateTime)value).ToString("yyyy-MM-dd HH:mm:ss"), -1, NegativePointer);
+                    }
+                    else // IsoString
+                    {
+                        SQLite3.BindText(stmt, index, ((DateTime)value).ToIsoString(), -1, NegativePointer);
                     }
                 }
                 else if (value is DateTimeOffset)
@@ -2923,14 +2928,19 @@ namespace Community.SQLite
                 }
                 else if (clrType == typeof(DateTime))
                 {
-                    if (_conn.StoreDateTimeAsTicks)
+                    if (_conn.DateTimeFormat == DateTimeFormat.Ticks)
                     {
                         return new DateTime(SQLite3.ColumnInt64(stmt, index));
                     }
                     else
                     {
+                        // try both string formats.
                         var text = SQLite3.ColumnString(stmt, index);
-                        return DateTime.Parse(text);
+                        object dt;
+                        if (IsoDateTimeUtils.TryParseDateIso(text, DateTimeZoneHandling.Unspecified, out dt))
+                            return dt;
+
+                        return DateTime.Parse(text/*, LegacyDateTimeFormat, CultureInfo.InvariantCulture */);
                     }
                 }
                 else if (clrType == typeof(DateTimeOffset))
@@ -3036,7 +3046,7 @@ namespace Community.SQLite
             {
                 for (int i = 0; i < source.Length; i++)
                 {
-                    SQLiteCommand.BindParameter(Statement, i + 1, source[i], Connection.StoreDateTimeAsTicks);
+                    SQLiteCommand.BindParameter(Statement, i + 1, source[i], Connection.DateTimeFormat);
                 }
             }
             r = SQLite3.Step(Statement);

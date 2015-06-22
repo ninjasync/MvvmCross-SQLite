@@ -47,7 +47,7 @@ namespace Community.SQLite
             {
                 for (int i = 0; i < source.Length; i++)
                 {
-                    SQLiteCommand.BindParameter(Statement, i + 1, source[i], Connection.StoreDateTimeAsTicks);
+                    SQLiteCommand.BindParameter(Statement, i + 1, source[i], Connection.DateTimeFormat);
                 }
             }
 

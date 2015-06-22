@@ -37,15 +37,15 @@ namespace Community.SQLite
 		SQLiteConnectionString _connectionString;
         SQLiteOpenFlags _openFlags;
 
-        public SQLiteAsyncConnection(string databasePath, bool storeDateTimeAsTicks = false)
-            : this(databasePath, SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create, storeDateTimeAsTicks)
+        public SQLiteAsyncConnection(string databasePath, DateTimeFormat dateTimeFormat = DateTimeFormat.String)
+            : this(databasePath, SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create, dateTimeFormat)
         {
         }
         
-        public SQLiteAsyncConnection(string databasePath, SQLiteOpenFlags openFlags, bool storeDateTimeAsTicks = false)
+        public SQLiteAsyncConnection(string databasePath, SQLiteOpenFlags openFlags, DateTimeFormat dateTimeFormat = DateTimeFormat.String)
         {
             _openFlags = openFlags;
-            _connectionString = new SQLiteConnectionString(databasePath, storeDateTimeAsTicks);
+            _connectionString = new SQLiteConnectionString(databasePath, dateTimeFormat);
         }
 
 		SQLiteConnectionWithLock GetConnection ()
@@ -479,7 +479,7 @@ namespace Community.SQLite
 		readonly object _lockPoint = new object ();
 
         public SQLiteConnectionWithLock (SQLiteConnectionString connectionString, SQLiteOpenFlags openFlags)
-			: base (connectionString.DatabasePath, openFlags, connectionString.StoreDateTimeAsTicks)
+			: base (connectionString.DatabasePath, openFlags, connectionString.DateTimeFormat)
 		{
 		}
 

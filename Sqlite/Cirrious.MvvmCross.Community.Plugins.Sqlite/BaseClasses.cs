@@ -79,11 +79,18 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// documented issue:
         /// https://github.com/slodge/MvvmCross/issues/213#issuecomment-24610834
         /// </remarks>
-        public bool StoreDateTimeAsTicks { get; set; }        
+        public bool StoreDateTimeAsTicks { get { return DateTimeFormat == DateTimeFormat.Ticks; } set { DateTimeFormat = value ? DateTimeFormat.Ticks : DateTimeFormat.String;}}        
         /// <summary>
         /// States which type of database should be created. (Default: File)
         /// </summary>
         public DatabaseType Type { get; set; }
+
+        /// <summary>
+        /// Supercedes 'StoreDateTimeAsTicks'. It allows you to specify 'IsoString' allowing
+        /// preservation of time zone information and fractions of seconds while keeping 
+        /// a human readable format.
+        /// </summary>
+        public DateTimeFormat DateTimeFormat { get; set; }
 
         /// <summary>
         /// Types of databases that can be created.
@@ -103,6 +110,29 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
             /// </summary>
             Temporary,
         }
+    }
+
+    public enum DateTimeFormat
+    {
+        /// <summary>
+        /// This is the default. Time zone information is lost.
+        /// </summary>
+        Ticks,
+        /// <summary>
+        /// This is the legacy mode. Time zone information is lost.
+        /// Not recommended.
+        /// <para/>
+        /// </summary>
+        String,
+        /// <summary>
+        /// This stores DateTime values as ISO 8601 format, e.g. "2012-03-21T05:40Z"
+        /// This will perserve fractions of seconds and the time zone.
+        /// <para/>
+        /// Uses an optimized parser. When using this string format, DateTime values 
+        /// stored in the 'String' format will also successfully be read from the 
+        /// database (without the performance benefits of the optimized parser).
+        /// </summary>
+        IsoString,
     }
 
     public interface ISQLiteConnectionFactoryEx
@@ -403,7 +433,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
 
         bool Trace { get; set; }
 
-        bool StoreDateTimeAsTicks { get; }
+        DateTimeFormat DateTimeFormat { get; }
 
         /// <summary>
         /// Sets a busy handler to sleep the specified amount of time when a table is locked.
@@ -1069,17 +1099,17 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
 #endif
             var path = options.BasePath ?? GetDefaultBasePath();
             string filePath = LocalPathCombine(path, options.Address);
-            return CreateSQLiteConnection(filePath, options.StoreDateTimeAsTicks);
+            return CreateSQLiteConnection(filePath, options.DateTimeFormat);
         }
 
         private ISQLiteConnection CreateInMemoryDb(SQLiteConnectionOptions options)
         {
-            return CreateSQLiteConnection(InMemoryDatabase, options.StoreDateTimeAsTicks);
+            return CreateSQLiteConnection(InMemoryDatabase, options.DateTimeFormat);
         }
 
         private ISQLiteConnection CreateTempDb(SQLiteConnectionOptions options)
         {
-            return CreateSQLiteConnection(string.Empty, options.StoreDateTimeAsTicks);
+            return CreateSQLiteConnection(string.Empty, options.DateTimeFormat);
         }
 
         /// <summary>
@@ -1104,17 +1134,18 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         /// The combined paths.
         /// </returns>
         protected abstract string LocalPathCombine(string path1, string path2);
+
         /// <summary>
         /// Creates the platform specific SQLiteConnection.
         /// </summary>
         /// <param name="databasePath">
-        /// The name of a file that does or will contain the database.
+        ///     The name of a file that does or will contain the database.
         /// </param>
         /// <param name="storeDateTimeAsTicks">
-        /// If true will store DateTime properties as ticks; otherwise it
-        /// will not.
+        ///     If true will store DateTime properties as ticks; otherwise it
+        ///     will not.
         /// </param>
         /// <returns>Returns the interface to a SQLiteConnection.</returns>
-        protected abstract ISQLiteConnection CreateSQLiteConnection(string databasePath, bool storeDateTimeAsTicks);
+        protected abstract ISQLiteConnection CreateSQLiteConnection(string databasePath, DateTimeFormat storeDateTimeAsTicks);
     }
 }
