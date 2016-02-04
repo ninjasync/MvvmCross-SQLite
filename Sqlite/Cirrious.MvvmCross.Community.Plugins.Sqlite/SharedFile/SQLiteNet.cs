@@ -364,7 +364,11 @@ namespace Community.SQLite
 #if !DOT42
                     SQLite3.BusyTimeout(Handle, (int)_busyTimeout.TotalMilliseconds);
 #else
-                    Handle.ExecSQL("pragma busy_timeout = " + _busyTimeout.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture) + ";");
+                    // http://stackoverflow.com/questions/5163320/android-sqlite-changing-journal-mode
+                    var c = Handle.RawQuery("pragma busy_timeout = " + _busyTimeout.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture) + ";", null);
+                    c.MoveToNext();c.GetString(0); // ensure the query gets executed.
+                    c.Close();
+                    //Handle.ExecSQL("pragma busy_timeout = " + _busyTimeout.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture) + ";");
 #endif
                 }
             }
