@@ -236,6 +236,20 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         }
     }
 
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+    public class IndexAttribute : Attribute
+    {
+        public string Name { get; set; }
+        public bool Unique { get; set; }
+        public string[] Columns { get; set; }
+
+        public IndexAttribute(string name, params string[] columns)
+        {
+            Name = name;
+            Columns = columns;
+        }
+    }
+
     [AttributeUsage(AttributeTargets.Property)]
     public class ColumnAttribute : Attribute
     {

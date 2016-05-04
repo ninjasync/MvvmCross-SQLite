@@ -2206,6 +2206,23 @@ namespace Community.SQLite
                 GetByPrimaryKeySql = string.Format("select * from \"{0}\" limit 1", TableName);
                 GetByPrimaryKeySqlWithVariableTable = "select * from \"{0}\" limit 1";
             }
+
+#if USE_NEW_REFLECTION_API
+            var indexAttrs = System.Reflection.CustomAttributeExtensions
+                .GetCustomAttributes(type.GetTypeInfo(), typeof(IndexAttribute), true);
+#else
+            var indexAttrs = type.GetCustomAttributes(typeof(IndexAttribute), true);
+#endif
+            foreach (IndexAttribute index in indexAttrs)
+            {
+                int idx = 0;
+                foreach (var colName in index.Columns)
+                {
+                    var col = Columns.First(c => c.PropertyName == colName);
+                    col.Indices.Add(new IndexedAttribute(index.Name, idx) {Unique = index.Unique});
+                    ++idx;
+                }
+            }
         }
 
         public string GetPrimaryKeyClause()
@@ -2352,7 +2369,7 @@ namespace Community.SQLite
 
             public bool IsPK { get; private set; }
 
-            public IEnumerable<IndexedAttribute> Indices { get; set; }
+            public List<IndexedAttribute> Indices { get; set; }
 
             public bool IsNullable { get; private set; }
 
@@ -2376,14 +2393,14 @@ namespace Community.SQLite
                 IsAutoGuid = isAuto && ColumnType == typeof(Guid);
                 IsAutoInc = isAuto && !IsAutoGuid;
 
-                Indices = Orm.GetIndices(prop);
+                Indices = Orm.GetIndices(prop).ToList();
                 if (!Indices.Any()
                     && !IsPK
                     && ((createFlags & CreateFlags.ImplicitIndex) == CreateFlags.ImplicitIndex)
                     && Name.EndsWith(Orm.ImplicitIndexSuffix, StringComparison.OrdinalIgnoreCase)
                     )
                 {
-                    Indices = new IndexedAttribute[] { new IndexedAttribute() };
+                    Indices = new List<IndexedAttribute> { new IndexedAttribute() };
                 }
                 IsNullable = !(IsPK || Orm.IsMarkedNotNull(prop));
                 MaxStringLength = Orm.MaxStringLength(prop);
