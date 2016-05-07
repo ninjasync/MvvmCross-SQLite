@@ -65,6 +65,9 @@
     <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\PluginLoader.cs">
       <Link>PluginLoader.cs</Link>
     </Compile>
+    <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\SharedFile\ExecutionTimer.cs">
+      <Link>ExecutionTimer.cs</Link>
+    </Compile>
     <Compile Include="..\Cirrious.MvvmCross.Community.Plugins.Sqlite\SharedFile\IsoDateTimeUtils.cs">
       <Link>IsoDateTimeUtils.cs</Link>
     </Compile>

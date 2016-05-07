@@ -221,15 +221,14 @@ namespace Community.SQLite
         private TimeSpan _busyTimeout;
         private Dictionary<string, TableMapping> _mappings = null;
         private Dictionary<string, TableMapping> _tables = null;
-        private System.Diagnostics.Stopwatch _sw;
-        private long _elapsedMilliseconds = 0;
+        internal ExecutionTimer _timer;
 
 #if !DOT42
         private int _transactionDepth = 0;
 #else
         private AtomicInteger _transactionDepth = new AtomicInteger();
 #endif
-        private Random _rand = new Random();
+        private readonly Random _rand = new Random();
 
         public Sqlite3DatabaseHandle Handle { get; private set; }
         internal static readonly Sqlite3DatabaseHandle NullHandle = default(Sqlite3DatabaseHandle);
@@ -242,6 +241,7 @@ namespace Community.SQLite
         public bool TimeExecution { get; set; }
 
         public bool Trace { get; set; }
+        public Action<string> TraceFunc { get; set; }
 
         public DateTimeFormat  DateTimeFormat { get; private set; }
 
@@ -308,6 +308,8 @@ namespace Community.SQLite
             DateTimeFormat = dateTimeFormat;
 
             BusyTimeout = TimeSpan.FromSeconds(0.1);
+            TraceFunc = s => Debug.WriteLine(s);
+            _timer = new ExecutionTimer(this);
         }
 
 #if __IOS__
@@ -748,52 +750,20 @@ namespace Community.SQLite
         {
             var cmd = CreateCommand(query, args);
 
-            if (TimeExecution)
+            using (_timer.Time())
             {
-                if (_sw == null)
-                {
-                    _sw = new Stopwatch();
-                }
-                _sw.Reset();
-                _sw.Start();
+                return cmd.ExecuteNonQuery();
             }
-
-            var r = cmd.ExecuteNonQuery();
-
-            if (TimeExecution)
-            {
-                _sw.Stop();
-                _elapsedMilliseconds += _sw.ElapsedMilliseconds;
-                Debug.WriteLine(string.Format("Finished in {0} ms ({1:0.0} s total)", _sw.ElapsedMilliseconds, _elapsedMilliseconds / 1000.0));
-            }
-
-            return r;
         }
 
         public T ExecuteScalar<T>(string query, params object[] args)
         {
             var cmd = CreateCommand(query, args);
 
-            if (TimeExecution)
+            using (_timer.Time())
             {
-                if (_sw == null)
-                {
-                    _sw = new Stopwatch();
-                }
-                _sw.Reset();
-                _sw.Start();
+                return cmd.ExecuteScalar<T>();
             }
-
-            var r = cmd.ExecuteScalar<T>();
-
-            if (TimeExecution)
-            {
-                _sw.Stop();
-                _elapsedMilliseconds += _sw.ElapsedMilliseconds;
-                Debug.WriteLine(string.Format("Finished in {0} ms ({1:0.0} s total)", _sw.ElapsedMilliseconds, _elapsedMilliseconds / 1000.0));
-            }
-
-            return r;
         }
 
         /// <summary>
@@ -813,8 +783,11 @@ namespace Community.SQLite
         /// </returns>
         public List<T> Query<[SerializedParameter] T>(string query, params object[] args)
         {
-            var cmd = CreateCommand(query, args);
-            return cmd.ExecuteQuery<T>();
+            using (_timer.Time())
+            {
+                var cmd = CreateCommand(query, args);
+                return cmd.ExecuteQuery<T>();
+            }
         }
 
         /// <summary>
@@ -862,8 +835,11 @@ namespace Community.SQLite
         /// </returns>
         public List<object> Query(ITableMapping map, string query, params object[] args)
         {
-            var cmd = CreateCommand(query, args);
-            return cmd.ExecuteQuery<object>(map);
+            using (_timer.Time())
+            {
+                var cmd = CreateCommand(query, args);
+                return cmd.ExecuteQuery<object>(map);
+            }
         }
 
         /// <summary>
@@ -2596,9 +2572,9 @@ namespace Community.SQLite
 
         public int ExecuteNonQuery()
         {
-            if (_conn.Trace)
+            if (_conn.Trace && _conn.TraceFunc != null)
             {
-                Debug.WriteLine("Executing: " + this);
+                _conn.TraceFunc("Executing: " + this);
             }
 
             var r = SQLite3.Result.OK;
@@ -2666,72 +2642,78 @@ namespace Community.SQLite
 
         public IEnumerable<T> ExecuteDeferredQuery<T>(ITableMapping map)
         {
-            if (_conn.Trace)
+            if (_conn.Trace && _conn.TraceFunc != null)
             {
-                Debug.WriteLine("Executing Query: " + this);
+                _conn.TraceFunc("Executing Query: " + this);
             }
 
-            var stmt = Prepare();
-            try
+            using (_conn._timer.Time("Deferred"))
             {
-                var cols = new TableMapping.Column[SQLite3.ColumnCount(stmt)];
-
-                for (int i = 0; i < cols.Length; i++)
+                var stmt = Prepare();
+                try
                 {
-                    var name = SQLite3.ColumnName16(stmt, i);
-                    cols[i] = ((TableMapping)map).FindColumn(name);
-                }
+                    var cols = new TableMapping.Column[SQLite3.ColumnCount(stmt)];
 
-                while (SQLite3.Step(stmt) == SQLite3.Result.Row)
-                {
-                    var obj = Activator.CreateInstance(((TableMapping)map).MappedType);
                     for (int i = 0; i < cols.Length; i++)
                     {
-                        if (cols[i] == null)
-                            continue;
-                        var colType = SQLite3.ColumnType(stmt, i);
-                        var val = ReadCol(stmt, i, colType, cols[i].ColumnType);
-                        cols[i].SetValue(obj, val);
+                        var name = SQLite3.ColumnName16(stmt, i);
+                        cols[i] = ((TableMapping) map).FindColumn(name);
                     }
-                    OnInstanceCreated(obj);
-                    yield return (T)obj;
+
+                    while (SQLite3.Step(stmt) == SQLite3.Result.Row)
+                    {
+                        var obj = Activator.CreateInstance(((TableMapping) map).MappedType);
+                        for (int i = 0; i < cols.Length; i++)
+                        {
+                            if (cols[i] == null)
+                                continue;
+                            var colType = SQLite3.ColumnType(stmt, i);
+                            var val = ReadCol(stmt, i, colType, cols[i].ColumnType);
+                            cols[i].SetValue(obj, val);
+                        }
+                        OnInstanceCreated(obj);
+                        yield return (T) obj;
+                    }
                 }
-            }
-            finally
-            {
-                SQLite3.Finalize(stmt);
+                finally
+                {
+                    SQLite3.Finalize(stmt);
+                }
             }
         }
 
         private IEnumerable<T> ExecuteDeferredQueryForPrimitive<T>()
         {
-            if (_conn.Trace)
+            if (_conn.Trace && _conn.TraceFunc != null)
             {
-                Debug.WriteLine("Executing Query: " + this);
+                _conn.TraceFunc("Executing Query: " + this);
             }
 
-            var stmt = Prepare();
-            var type = typeof(T);
-            try
+            using (_conn._timer.Time("Deferred"))
             {
-                while (SQLite3.Step(stmt) == SQLite3.Result.Row)
+                var stmt = Prepare();
+                var type = typeof(T);
+                try
                 {
-                    var colType = SQLite3.ColumnType(stmt, 0);
-                    // TODO: this should be optimized to use a delegate
-                    yield return (T) ReadCol(stmt, 0, colType, type);
+                    while (SQLite3.Step(stmt) == SQLite3.Result.Row)
+                    {
+                        var colType = SQLite3.ColumnType(stmt, 0);
+                        // TODO: this should be optimized to use a delegate
+                        yield return (T) ReadCol(stmt, 0, colType, type);
+                    }
                 }
-            }
-            finally
-            {
-                SQLite3.Finalize(stmt);
+                finally
+                {
+                    SQLite3.Finalize(stmt);
+                }
             }
         }
 
         public T ExecuteScalar<T>()
         {
-            if (_conn.Trace)
+            if (_conn.Trace && _conn.TraceFunc != null)
             {
-                Debug.WriteLine("Executing Query: " + this);
+                 _conn.TraceFunc("Executing Query: " + this);
             }
 
             T val = default(T);
@@ -3049,9 +3031,9 @@ namespace Community.SQLite
 
         public int ExecuteNonQuery(object[] source)
         {
-            if (Connection.Trace)
+            if (Connection.Trace && Connection.TraceFunc != null)
             {
-                Debug.WriteLine("Executing: " + CommandText);
+                Connection.TraceFunc("Executing: " + CommandText);
             }
 
             var r = SQLite3.Result.OK;

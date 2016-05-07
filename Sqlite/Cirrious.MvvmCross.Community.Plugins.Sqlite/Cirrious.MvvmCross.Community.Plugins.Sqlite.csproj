@@ -48,6 +48,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="SerializedParameter.cs" />
+    <Compile Include="SharedFile\ExecutionTimer.cs" />
     <None Include="SharedFile\IsoDateTimeUtils.cs" />
     <None Include="SharedFile\NxTableQuery.cs" />
     <None Include="SharedFile\SQLiteNet.cs" />

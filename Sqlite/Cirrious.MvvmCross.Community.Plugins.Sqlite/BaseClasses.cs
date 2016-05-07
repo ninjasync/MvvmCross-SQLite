@@ -446,6 +446,7 @@ namespace Cirrious.MvvmCross.Community.Plugins.Sqlite
         bool TimeExecution { get; set; }
 
         bool Trace { get; set; }
+        Action<string> TraceFunc { get; set; }
 
         DateTimeFormat DateTimeFormat { get; }
 
