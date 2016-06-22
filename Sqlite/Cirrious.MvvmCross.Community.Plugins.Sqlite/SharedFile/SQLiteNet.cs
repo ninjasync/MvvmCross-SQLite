@@ -448,6 +448,7 @@ namespace Community.SQLite
         {
             public string IndexName;
             public string TableName;
+            public string SchemaName;
             public bool Unique;
             public List<IndexedColumn> Columns;
         }
@@ -499,6 +500,20 @@ namespace Community.SQLite
             return CreateTable(ty, null, createFlags);
         }
 
+        /// <summary>
+        /// Executes a "create table if not exists" on the database. It also
+        /// creates any specified indexes on the columns of the table. It uses
+        /// a schema automatically generated from the specified type. You can
+        /// later access this schema by calling GetMapping.
+        /// </summary>
+        /// <param name="ty">Type to reflect to a database table.</param>
+        /// <param name="overwriteTableName">Force a specific table name. Can also specify a schema for 
+        /// an attached database e.g. "db2.TableName". As specifying a schema is only implemented for 
+        /// table creation, duplicate table names are not supported.</param>
+        /// <param name="createFlags">Optional flags allowing implicit PK and indexes based on naming conventions.</param>  
+        /// <returns>
+        /// The number of entries added to the database schema.
+        /// </returns>
         public int CreateTable(Type ty, string overwriteTableName, CreateFlags createFlags = CreateFlags.None)
         {
             if (_tables == null)
@@ -511,31 +526,41 @@ namespace Community.SQLite
                 map = GetMapping(ty, createFlags);
                 _tables.Add(ty.FullName, map);
             }
-            var tableName = (overwriteTableName ?? map.TableName);
-            var query = "create table if not exists \"" + tableName + "\"(\n";
 
-		    var pkCols = map.Columns.Where(p => p.IsPK); 
-			int numPkCols = pkCols.Count(); 
- 
-			var decls = map.Columns.Select(p => Orm.SqlDecl(p, DateTimeFormat, numPkCols == 1)); 
+            var schemaName = "main";
+            string tableName = overwriteTableName ?? map.TableName;
+            
+            if (overwriteTableName != null)
+                ExtractSchemaName(ref tableName, out schemaName);
 
-            var decl = string.Join(",\n", decls.ToArray());
-            query += decl;
+            // http://stackoverflow.com/questions/24785584/sqlite-create-table-if-not-exists
+            bool tableExists = GetTableInfo(tableName, schemaName).Count > 0;
 
-            if (numPkCols > 1)
+            if (!tableExists)
             {
-                query += string.Format(",\nprimary key ({0})\n", string.Join(", ", pkCols.Select(p => "\"" + p.Name + "\"")));
+                var query = "create table if not exists \"" + schemaName + "\".\"" + tableName + "\"(\n";
+
+                var pkCols = map.Columns.Where(p => p.IsPK);
+                int numPkCols = pkCols.Count();
+
+                var decls = map.Columns.Select(p => Orm.SqlDecl(p, DateTimeFormat, numPkCols == 1));
+
+                var decl = string.Join(",\n", decls.ToArray());
+                query += decl;
+
+                if (numPkCols > 1)
+                {
+                    query += string.Format(",\nprimary key ({0})\n", string.Join(", ", pkCols.Select(p => "\"" + p.Name + "\"")));
+                }
+
+                query += ")";
+
+                Execute(query);
             }
-
-            query += ")";
-
-            var count = Execute(query);
-
-            if (count == 0)
+            else 
             { 
-                //Possible bug: This always seems to return 0?
                 // Table already exists, migrate it
-                MigrateTable(map, tableName);
+                MigrateTable(map, tableName, schemaName);
             }
 
             var indexes = new Dictionary<string, IndexInfo>();
@@ -551,6 +576,7 @@ namespace Community.SQLite
                         {
                             IndexName = iname,
                             TableName = tableName,
+                            SchemaName = schemaName,
                             Unique = i.Unique,
                             Columns = new List<IndexedColumn>()
                         };
@@ -567,15 +593,35 @@ namespace Community.SQLite
                     });
                 }
             }
-
+            
+            int count = tableExists ? 0 : 1;
+            
             foreach (var indexName in indexes.Keys)
             {
                 var index = indexes[indexName];
                 var columns = index.Columns.OrderBy(i => i.Order).Select(i => i.ColumnName).ToArray();
-                count += CreateIndex(indexName, index.TableName, columns, index.Unique);
+                count += CreateIndex(indexName, index.TableName, columns, index.Unique, index.SchemaName);
             }
 
             return count;
+        }
+
+        private void ExtractSchemaName(ref string tableName, out string schemaName)
+        {
+            if (tableName.Contains('\''))
+                throw new ArgumentException(tableName);
+
+            int dot = tableName.IndexOf('.');
+
+            if (dot == -1)
+            {
+                schemaName = "main";
+            }
+            else
+            {
+                schemaName = tableName.Substring(0, dot);
+                tableName = tableName.Substring(dot + 1);
+            }
         }
 
         /// <summary>
@@ -585,10 +631,10 @@ namespace Community.SQLite
         /// <param name="tableName">Name of the database table</param>
         /// <param name="columnNames">An array of column names to index</param>
         /// <param name="unique">Whether the index should be unique</param>
-        public int CreateIndex(string indexName, string tableName, string[] columnNames, bool unique = false)
+        public int CreateIndex(string indexName, string tableName, string[] columnNames, bool unique = false, string schemaName = null)
         {
-            const string sqlFormat = "create {2} index if not exists \"{3}\" on \"{0}\"(\"{1}\")";
-            var sql = String.Format(sqlFormat, tableName, string.Join("\", \"", columnNames), unique ? "unique" : "", indexName);
+            const string sqlFormat = "create {2} index if not exists \"{4}\".\"{3}\" on \"{0}\"(\"{1}\")";
+            var sql = String.Format(sqlFormat, tableName, string.Join("\", \"", columnNames), unique ? "unique" : "", indexName, schemaName ?? "main");
             return Execute(sql);
         }
 
@@ -661,13 +707,18 @@ namespace Community.SQLite
 #endif
         public List<ColumnInfo> GetTableInfo(string tableName)
         {
-            var query = "pragma table_info(\"" + tableName + "\")";
+            return GetTableInfo(tableName, "main");
+        }
+
+        private List<ColumnInfo> GetTableInfo(string tableName, string schemaName)
+        {
+            var query = "pragma \"" + schemaName + "\".table_info(\"" + tableName + "\")";
             return Query<ColumnInfo>(query);
         }
 
-        void MigrateTable(TableMapping map, string trueTableName)
+        void MigrateTable(TableMapping map, string trueTableName, string trueSchemaName)
         {
-            var existingCols = GetTableInfo(trueTableName);
+            var existingCols = GetTableInfo(trueTableName, trueSchemaName);
 
             var toBeAdded = new List<TableMapping.Column>();
 
@@ -688,7 +739,7 @@ namespace Community.SQLite
 
             foreach (var p in toBeAdded)
             {
-                var addCol = "alter table \"" + trueTableName + "\" add column " + Orm.SqlDecl(p, DateTimeFormat);
+                var addCol = "alter table \"" + trueSchemaName + "\".\"" + trueTableName + "\" add column " + Orm.SqlDecl(p, DateTimeFormat);
                 Execute(addCol);
             }
         }
