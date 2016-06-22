@@ -2940,7 +2940,7 @@ namespace Community.SQLite
                         // try both string formats.
                         var text = SQLite3.ColumnString(stmt, index);
                         object dt;
-                        if (IsoDateTimeUtils.TryParseDateIso(text, DateTimeZoneHandling.Unspecified, out dt))
+                        if (IsoDateTimeUtils.TryParseDateIso(text, DateTimeZoneHandling.RoundtripKind, out dt))
                             return dt;
 
                         return DateTime.Parse(text/*, LegacyDateTimeFormat, CultureInfo.InvariantCulture */);
